@@ -1,7 +1,7 @@
-From bea7911a7a7179bb82632cee4a84a6f8d3655a16 Mon Sep 17 00:00:00 2001
+From ed5858f50be0778d7c9e049c8829bbfca8cc92f3 Mon Sep 17 00:00:00 2001
 From: Juliusz Sosinowicz <juliusz@wolfssl.com>
-Date: Tue, 18 Aug 2026 23:43:51 +0000
-Subject: [PATCH] Update ntp 4.2.8p18 patch for wolfSSL
+Date: Wed, 19 Aug 2026 16:17:18 +0000
+Subject: [PATCH] Fix ntp 4.2.8p18 patch for wolfSSL
 
 ---
  configure.ac                      |  4 +++
@@ -23,7 +23,7 @@ Subject: [PATCH] Update ntp 4.2.8p18 patch for wolfSSL
  create mode 100644 sntp/m4/ntp_wolfssl.m4
 
 diff --git a/configure.ac b/configure.ac
-index aef7053..1262795 100644
+index aef7053..a6d3b65 100644
 --- a/configure.ac
 +++ b/configure.ac
 @@ -117,6 +117,8 @@ LIBOPTS_CHECK_NOBUILD([sntp/libopts])
@@ -39,7 +39,7 @@ index aef7053..1262795 100644
  esac
  AC_MSG_RESULT([$ans])
  
-+if test $USE_WOLFSSL = no; then
++if test "x$USE_WOLFSSL" = xno; then
  # if we have crypto, by default Autokey is enabled
  AC_ARG_ENABLE(
      [autokey],
@@ -283,14 +283,14 @@ index 1be2ea3..db1f302 100644
  #	    endif
  		/* [Bug 3457] DON'T use plain EVP_DigestInit! It would
 diff --git a/sntp/m4/ntp_libntp.m4 b/sntp/m4/ntp_libntp.m4
-index e0cc216..e63a33a 100644
+index e0cc216..d11f956 100644
 --- a/sntp/m4/ntp_libntp.m4
 +++ b/sntp/m4/ntp_libntp.m4
 @@ -1123,8 +1123,10 @@ dnl build from tarball.  It's only useful when modifying libntp source code
  dnl and rebuilding in a client subdir rather than the whole package.
  AM_CONDITIONAL([LIBNTP_SUBMAKES], [test x"$enable_dependency_tracking" = x"yes"])
  
-+if test $USE_WOLFSSL = no; then
++if test "x$USE_WOLFSSL" = xno; then
  NTP_OPENSSL
  NTP_CRYPTO_RAND
 +fi
@@ -299,7 +299,7 @@ index e0cc216..e63a33a 100644
  LDADD_LIBNTP="$LDADD_LIBNTP $LIBS"
 diff --git a/sntp/m4/ntp_wolfssl.m4 b/sntp/m4/ntp_wolfssl.m4
 new file mode 100644
-index 0000000..0f5da10
+index 0000000..f8d4de2
 --- /dev/null
 +++ b/sntp/m4/ntp_wolfssl.m4
 @@ -0,0 +1,58 @@
@@ -335,7 +335,7 @@ index 0000000..0f5da10
 +    USE_WOLFSSL=yes
 +],[USE_WOLFSSL=no])
 +
-+if test $USE_WOLFSSL = yes; then
++if test "x$USE_WOLFSSL" = xyes; then
 +    SAVED_CFLAGS=$CFLAGS
 +    CFLAGS="$CFLAGS $CPPFLAGS_NTP"
 +    AC_CHECK_HEADER([wolfssl/options.h])
