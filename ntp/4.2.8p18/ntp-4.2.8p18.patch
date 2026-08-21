@@ -299,10 +299,10 @@ index e0cc216..d11f956 100644
  LDADD_LIBNTP="$LDADD_LIBNTP $LIBS"
 diff --git a/sntp/m4/ntp_wolfssl.m4 b/sntp/m4/ntp_wolfssl.m4
 new file mode 100644
-index 0000000..f8d4de2
+index 0000000..75594ad
 --- /dev/null
 +++ b/sntp/m4/ntp_wolfssl.m4
-@@ -0,0 +1,58 @@
+@@ -0,0 +1,68 @@
 +dnl ####################################################################
 +dnl wolfSSL support
 +dnl
@@ -310,8 +310,7 @@ index 0000000..f8d4de2
 +dnl the wolfSSL library is used in place of OpenSSL:
 +dnl
 +dnl	- include paths and -lwolfssl are added to CPPFLAGS_NTP /
-+dnl	  LDADD_NTP so that all NTP binaries pick them up
-+dnl	- WOLFSSL_USE_OPTIONS_H is defined so that the wolfSSL headers
++dnl	  LDADD_NTP, and WOLFSSL_USE_OPTIONS_H makes the wolfSSL headers
 +dnl	  include the build-time options.h on behalf of NTP
 +dnl	- OPENSSL, WITH_WOLFSSL, ENABLE_CMAC, USE_OPENSSL_CRYPTO_RAND
 +dnl	  and AUTOKEY are defined for config.h
@@ -328,27 +327,38 @@ index 0000000..f8d4de2
 +dnl ####################################################################
 +AC_DEFUN([NTP_WOLFSSL], [
 +AC_ARG_WITH(wolfssl,
-+    AC_HELP_STRING([--with-wolfssl=DIR],[location of wolfssl]),
++    AS_HELP_STRING([--with-wolfssl=DIR],[location of wolfssl]),
 +[
-+    CPPFLAGS_NTP="$CPPFLAGS_NTP -I${withval}/include/ -I${withval}/include/wolfssl -DWOLFSSL_USE_OPTIONS_H"
-+    LDADD_NTP="$LDADD_NTP -L${withval}/lib -lwolfssl"
-+    USE_WOLFSSL=yes
++    case "$withval" in
++     no)
++        USE_WOLFSSL=no
++        ;;
++     yes|"")
++        AC_MSG_ERROR([--with-wolfssl needs the wolfSSL install prefix, e.g. --with-wolfssl=/usr/local])
++        ;;
++     *)
++        wolfssl_prefix=$withval
++        USE_WOLFSSL=yes
++        ;;
++    esac
 +],[USE_WOLFSSL=no])
 +
 +if test "x$USE_WOLFSSL" = xyes; then
-+    SAVED_CFLAGS=$CFLAGS
-+    CFLAGS="$CFLAGS $CPPFLAGS_NTP"
++    CPPFLAGS_NTP="$CPPFLAGS_NTP -I$wolfssl_prefix/include/ -I$wolfssl_prefix/include/wolfssl -DWOLFSSL_USE_OPTIONS_H"
++    LDADD_NTP="$LDADD_NTP -L$wolfssl_prefix/lib -lwolfssl"
++    SAVED_CPPFLAGS=$CPPFLAGS
++    CPPFLAGS="$CPPFLAGS $CPPFLAGS_NTP"
 +    AC_CHECK_HEADER([wolfssl/options.h])
-+    CFLAGS=$SAVED_CFLAGS
-+    if test $ac_cv_header_wolfssl_options_h = yes; then
++    CPPFLAGS=$SAVED_CPPFLAGS
++    if test "x$ac_cv_header_wolfssl_options_h" = xyes; then
 +        AC_MSG_CHECKING([for OPENSSL_EXTRA_BSD in wolfssl/options.h])
-+        if grep -q "define OPENSSL_EXTRA_BSD" ${withval}/include/wolfssl/options.h; then
++        if grep -q "define OPENSSL_EXTRA_BSD" "$wolfssl_prefix/include/wolfssl/options.h"; then
 +            ans=yes
 +        else
 +            ans=no
 +        fi
 +        AC_MSG_RESULT([$ans])
-+        if test $ans = no; then
++        if test "x$ans" = xno; then
 +            AC_MSG_ERROR([wolfSSL was built without OPENSSL_EXTRA_BSD, which is required for MD5Init/MD5Update/MD5Final. Rebuild wolfSSL with: ./configure --enable-ntp CFLAGS="-DOPENSSL_EXTRA_BSD"])
 +        fi
 +        AC_DEFINE([OPENSSL], [], [Use OpenSSL?])
