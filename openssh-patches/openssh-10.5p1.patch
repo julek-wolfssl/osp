@@ -27,15 +27,15 @@ make tests
 ```
 ---
  Makefile.in                                 |   1 +
- cipher-aesctr.h                             |   2 -
+ cipher-aesctr.h                             |   4 +
  cipher.c                                    |   3 +-
- configure.ac                                | 160 +++++++++++++++++++++++++++-
- includes.h                                  |  12 +++
- log.c                                       |  54 ++++++++++
+ configure.ac                                | 171 +++++++++++++++++++++++++++-
+ includes.h                                  |  12 ++
+ log.c                                       |  54 +++++++++
  openbsd-compat/openssl-compat.c             |   4 +
- regress/unittests/test_helper/test_helper.c |   6 ++
+ regress/unittests/test_helper/test_helper.c |   6 +
  sshkey.c                                    |   8 ++
- 9 files changed, 245 insertions(+), 5 deletions(-)
+ 9 files changed, 260 insertions(+), 3 deletions(-)
 
 diff --git a/Makefile.in b/Makefile.in
 index e9503e7..3a469cd 100644
@@ -50,18 +50,21 @@ index e9503e7..3a469cd 100644
  		PATH="$(BUILDDIR):$${PATH}" \
  		TEST_ENV=MALLOC_OPTIONS="@TEST_MALLOC_OPTIONS@" \
 diff --git a/cipher-aesctr.h b/cipher-aesctr.h
-index 85d55bb..d12d780 100644
+index 85d55bb..9776fb3 100644
 --- a/cipher-aesctr.h
 +++ b/cipher-aesctr.h
-@@ -20,8 +20,6 @@
+@@ -20,7 +20,11 @@
  
  #include "rijndael.h"
  
--#define AES_BLOCK_SIZE 16
--
++/* wolfSSL and OpenSSL both define this, and neither guards it. Only supply
++ * it when building against neither. */
++#ifndef AES_BLOCK_SIZE
+ #define AES_BLOCK_SIZE 16
++#endif
+ 
  typedef struct aesctr_ctx {
  	int	rounds;				/* keylen-dependent #rounds */
- 	u32	ek[4*(AES_MAXROUNDS + 1)];	/* encrypt key schedule */
 diff --git a/cipher.c b/cipher.c
 index 0697e55..4401c72 100644
 --- a/cipher.c
@@ -77,7 +80,7 @@ index 0697e55..4401c72 100644
  		/* compute tag (on encrypt) or verify tag (on decrypt) */
  		if (EVP_Cipher(cc->evp, NULL, NULL, 0) < 0)
 diff --git a/configure.ac b/configure.ac
-index cb1711f..bd59bb5 100644
+index cb1711f..64ac43e 100644
 --- a/configure.ac
 +++ b/configure.ac
 @@ -690,6 +690,7 @@ SHLIBEXT=".so"
@@ -96,7 +99,7 @@ index cb1711f..bd59bb5 100644
  	dnl Target SUSv3/POSIX.1-2001 plus BSD specifics.
  	dnl _DEFAULT_SOURCE is the new name for _BSD_SOURCE
  	dnl _GNU_SOURCE is needed for setres*id prototypes.
-@@ -2943,6 +2945,139 @@ AC_CHECK_FUNCS([getpgrp],[
+@@ -2943,6 +2945,145 @@ AC_CHECK_FUNCS([getpgrp],[
  	)
  ])
  
@@ -105,6 +108,10 @@ index cb1711f..bd59bb5 100644
 +AC_ARG_WITH(wolfssl,
 +	[  --with-wolfssl=PATH      PATH to wolfssl install (default /usr/local) ],
 +	[
++	# --without-wolfssl reaches here too, with withval=no. Leave wolfSSL
++	# off in that case and let the OpenSSL checks below run.
++	if test "x${withval}" != "xno" ; then
++
 +	wolfssl_install_dir=/usr/local
 +
 +	if test "x${withval}" != "xyes" ; then
@@ -227,6 +234,8 @@ index cb1711f..bd59bb5 100644
 +	else
 +		AC_MSG_RESULT([no])
 +	fi
++
++	fi
 +])
 +
 +AC_SUBST([ENABLE_WOLFSSL])
@@ -236,21 +245,20 @@ index cb1711f..bd59bb5 100644
  # Search for OpenSSL
  saved_CPPFLAGS="$CPPFLAGS"
  saved_LDFLAGS="$LDFLAGS"
-@@ -3366,6 +3501,13 @@ if test "x$openssl" = "xyes" ; then
- 	esac
+@@ -3367,6 +3508,12 @@ if test "x$openssl" = "xyes" ; then
  
  fi
-+LIBS="$nocrypto_saved_LIBS"
-+
+ 
 +else
 +    AC_CHECK_LIB([crypt], [crypt], [LIBS="$LIBS -lcrypt"])
 +    AC_CHECK_FUNCS([crypt])
 +fi # ENABLE_WOLFSSL endif
 +
- 
++
  # PKCS11/U2F depend on OpenSSL and dlopen().
  enable_pkcs11=yes
-@@ -3374,6 +3516,15 @@ enable_sk=yes
+ enable_sk=yes
+@@ -3374,6 +3521,15 @@ enable_sk=yes
  if test "x$openssl_impl" = "xaws-lc"; then
  	enable_pkcs11="disabled; PKCS#11 not supported with AWS-LC"
  fi
@@ -266,7 +274,7 @@ index cb1711f..bd59bb5 100644
  if test "x$ac_cv_func_dlopen" != "xyes" ; then
  	enable_pkcs11="disabled; missing dlopen(3)"
  	enable_sk="disabled; missing dlopen(3)"
-@@ -3592,12 +3743,13 @@ elif test ! -z "$OPENSSL_SEEDS_ITSELF" ; then
+@@ -3592,12 +3748,19 @@ elif test ! -z "$OPENSSL_SEEDS_ITSELF" ; then
  	AC_DEFINE([OPENSSL_PRNG_ONLY], [1],
  		[Define if you want the OpenSSL internally seeded PRNG only])
  	RAND_MSG="OpenSSL internal ONLY"
@@ -279,10 +287,16 @@ index cb1711f..bd59bb5 100644
  	AC_MSG_ERROR([OpenSSH has no source of random numbers. Please configure OpenSSL with an entropy source or re-run configure using one of the --with-prngd-port or --with-prngd-socket options])
  fi
 -LIBS="$nocrypto_saved_LIBS"
++
++# Upstream restores here, after the entropy probes above have used -lcrypto.
++# wolfSSL builds keep theirs, since -lwolfssl has to stay on the link line.
++if test "x$ENABLE_WOLFSSL" != "xyes" ; then
++	LIBS="$nocrypto_saved_LIBS"
++fi
  
  saved_LIBS="$LIBS"
  AC_CHECK_LIB([iaf], [ia_openinfo], [
-@@ -3639,6 +3791,9 @@ AC_ARG_WITH([pam],
+@@ -3639,6 +3802,9 @@ AC_ARG_WITH([pam],
  			PAM_MSG="yes"
  
  			SSHDLIBS="$SSHDLIBS -lpam"
@@ -292,7 +306,7 @@ index cb1711f..bd59bb5 100644
  			AC_DEFINE([USE_PAM], [1],
  				[Define if you want to enable PAM support])
  
-@@ -5883,6 +6038,7 @@ echo "         Solaris privilege support: $SPP_MSG"
+@@ -5883,6 +6049,7 @@ echo "         Solaris privilege support: $SPP_MSG"
  echo "       IP address in \$DISPLAY hack: $DISPLAY_HACK_MSG"
  echo "           Translate v4 in v6 hack: $IPV4_IN6_HACK_MSG"
  echo "                  BSD Auth support: $BSD_AUTH_MSG"
