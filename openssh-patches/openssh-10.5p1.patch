@@ -29,13 +29,13 @@ make tests
  Makefile.in                                 |   1 +
  cipher-aesctr.h                             |   2 -
  cipher.c                                    |   3 +-
- configure.ac                                | 158 +++++++++++++++++++-
- includes.h                                  |  12 ++
- log.c                                       |  46 ++++++
+ configure.ac                                | 160 +++++++++++++++++++++++++++-
+ includes.h                                  |  12 +++
+ log.c                                       |  54 ++++++++++
  openbsd-compat/openssl-compat.c             |   4 +
- regress/unittests/test_helper/test_helper.c |   4 +
- sshkey.c                                    |   8 +
- 9 files changed, 233 insertions(+), 5 deletions(-)
+ regress/unittests/test_helper/test_helper.c |   6 ++
+ sshkey.c                                    |   8 ++
+ 9 files changed, 245 insertions(+), 5 deletions(-)
 
 diff --git a/Makefile.in b/Makefile.in
 index e9503e7..3a469cd 100644
@@ -77,7 +77,7 @@ index 0697e55..4401c72 100644
  		/* compute tag (on encrypt) or verify tag (on decrypt) */
  		if (EVP_Cipher(cc->evp, NULL, NULL, 0) < 0)
 diff --git a/configure.ac b/configure.ac
-index cb1711f..e57d4fc 100644
+index cb1711f..bd59bb5 100644
 --- a/configure.ac
 +++ b/configure.ac
 @@ -690,6 +690,7 @@ SHLIBEXT=".so"
@@ -96,7 +96,7 @@ index cb1711f..e57d4fc 100644
  	dnl Target SUSv3/POSIX.1-2001 plus BSD specifics.
  	dnl _DEFAULT_SOURCE is the new name for _BSD_SOURCE
  	dnl _GNU_SOURCE is needed for setres*id prototypes.
-@@ -2943,6 +2945,137 @@ AC_CHECK_FUNCS([getpgrp],[
+@@ -2943,6 +2945,139 @@ AC_CHECK_FUNCS([getpgrp],[
  	)
  ])
  
@@ -147,7 +147,9 @@ index cb1711f..e57d4fc 100644
 +	AC_DEFINE([USING_WOLFSSL], [1], [Defined if using WolfSSL])
 +	AC_DEFINE([WOLFSSL_USE_OPTIONS_H], [1],
 +		[Let wolfSSL headers pull in options.h themselves])
-+	AC_DEFINE([WITH_OPENSSL], [1], [Defined if using WolfSSL])
++	AC_DEFINE([WITH_OPENSSL], [1],
++		[Build the OpenSSL-compatible crypto paths. Named for OpenSSL,
++		 but satisfied here by wolfSSL's compatibility layer.])
 +	AC_DEFINE([UNSUPPORTED_POSIX_THREADS_HACK], [1], [Defined if using WolfSSL])
 +	# OpenSSL tests for these. Just assume these are present for wolfSSL.
 +	AC_DEFINE([HAVE_BN_IS_PRIME_EX], [1], [Defined if using WolfSSL])
@@ -187,7 +189,7 @@ index cb1711f..e57d4fc 100644
 +	# error macro not defined
 +	#endif
 +	]])], [ wolfssl_fips=yes ], [ wolfssl_fips=no ])
-+	if test "x$wolfssl_fips" == "xyes" ; then
++	if test "x$wolfssl_fips" = "xyes" ; then
 +		AC_DEFINE([USING_WOLFSSL_FIPS], [1], [Defined if using wolfSSL FIPS])
 +		AC_MSG_RESULT([yes])
 +	else
@@ -205,7 +207,7 @@ index cb1711f..e57d4fc 100644
 +	#endif
 +	]])], [ wolf_has_aesni=yes ], [ wolf_has_aesni=no ])
 +
-+	if test "x$wolf_has_aesni" == "xyes" ; then
++	if test "x$wolf_has_aesni" = "xyes" ; then
 +		AC_MSG_RESULT([yes])
 +		AC_MSG_CHECKING([is gcc compiler detected])
 +		if test "$GCC" = "yes"
@@ -234,7 +236,7 @@ index cb1711f..e57d4fc 100644
  # Search for OpenSSL
  saved_CPPFLAGS="$CPPFLAGS"
  saved_LDFLAGS="$LDFLAGS"
-@@ -3366,6 +3499,13 @@ if test "x$openssl" = "xyes" ; then
+@@ -3366,6 +3501,13 @@ if test "x$openssl" = "xyes" ; then
  	esac
  
  fi
@@ -248,7 +250,7 @@ index cb1711f..e57d4fc 100644
  
  # PKCS11/U2F depend on OpenSSL and dlopen().
  enable_pkcs11=yes
-@@ -3374,6 +3514,15 @@ enable_sk=yes
+@@ -3374,6 +3516,15 @@ enable_sk=yes
  if test "x$openssl_impl" = "xaws-lc"; then
  	enable_pkcs11="disabled; PKCS#11 not supported with AWS-LC"
  fi
@@ -264,7 +266,7 @@ index cb1711f..e57d4fc 100644
  if test "x$ac_cv_func_dlopen" != "xyes" ; then
  	enable_pkcs11="disabled; missing dlopen(3)"
  	enable_sk="disabled; missing dlopen(3)"
-@@ -3592,12 +3741,13 @@ elif test ! -z "$OPENSSL_SEEDS_ITSELF" ; then
+@@ -3592,12 +3743,13 @@ elif test ! -z "$OPENSSL_SEEDS_ITSELF" ; then
  	AC_DEFINE([OPENSSL_PRNG_ONLY], [1],
  		[Define if you want the OpenSSL internally seeded PRNG only])
  	RAND_MSG="OpenSSL internal ONLY"
@@ -280,7 +282,7 @@ index cb1711f..e57d4fc 100644
  
  saved_LIBS="$LIBS"
  AC_CHECK_LIB([iaf], [ia_openinfo], [
-@@ -3639,6 +3789,9 @@ AC_ARG_WITH([pam],
+@@ -3639,6 +3791,9 @@ AC_ARG_WITH([pam],
  			PAM_MSG="yes"
  
  			SSHDLIBS="$SSHDLIBS -lpam"
@@ -290,7 +292,7 @@ index cb1711f..e57d4fc 100644
  			AC_DEFINE([USE_PAM], [1],
  				[Define if you want to enable PAM support])
  
-@@ -5883,6 +6036,7 @@ echo "         Solaris privilege support: $SPP_MSG"
+@@ -5883,6 +6038,7 @@ echo "         Solaris privilege support: $SPP_MSG"
  echo "       IP address in \$DISPLAY hack: $DISPLAY_HACK_MSG"
  echo "           Translate v4 in v6 hack: $IPV4_IN6_HACK_MSG"
  echo "                  BSD Auth support: $BSD_AUTH_MSG"
@@ -322,18 +324,21 @@ index 96cddbc..1fdbe63 100644
  #include <openssl/opensslv.h> /* For OPENSSL_VERSION_NUMBER */
  #endif
 diff --git a/log.c b/log.c
-index 2903871..17d118c 100644
+index 2903871..fcea66a 100644
 --- a/log.c
 +++ b/log.c
-@@ -186,6 +186,40 @@ log_verbose_reset(void)
+@@ -186,6 +186,43 @@ log_verbose_reset(void)
  	nlog_verbose = 0;
  }
  
 +static void Logging_cb(const int logLevel, const char *const logMessage) {
++    (void)logLevel;
 +    debug("wolfSSL: %s", logMessage);
 +}
 +
-+#ifdef WC_RNG_SEED_CB
++/* getrandom(2) is the only seed source that survives the sandbox the
++ * privsep child runs under. Without it, leave wolfSSL on its default. */
++#if defined(WC_RNG_SEED_CB) && defined(HAVE_GETRANDOM)
 +#include <sys/random.h>
 +static int wolf_seed(OS_Seed* os, byte* output, word32 sz)
 +{
@@ -366,20 +371,25 @@ index 2903871..17d118c 100644
  /*
   * Initialize the log.
   */
-@@ -200,6 +234,18 @@ log_init(const char *av0, LogLevel level, SyslogFacility facility,
+@@ -200,6 +237,23 @@ log_init(const char *av0, LogLevel level, SyslogFacility facility,
  
  	argv0 = av0;
  
 +	/* hijack log init callback since every ssh program calls it
 +     * to make sure wolfssl is inited and has a seed callback registered */
 +#ifdef USING_WOLFSSL
-+    wolfSSL_Debugging_ON();
++    /* Follow the level the caller asked for rather than logging
++     * unconditionally. No-op unless wolfSSL was built with DEBUG_WOLFSSL. */
++    if (level >= SYSLOG_LEVEL_DEBUG1)
++        wolfSSL_Debugging_ON();
 +    wolfSSL_SetLoggingCb(Logging_cb);
 +    wolfSSL_Init();
 +#ifndef WC_RNG_SEED_CB
 +#error wolfSSL needs to be built with WC_RNG_SEED_CB
 +#endif
++#ifdef HAVE_GETRANDOM
 +    wc_SetSeed_Cb(wolf_seed);
++#endif
 +#endif
 +
  	if (log_change_level(level) != 0) {
@@ -401,20 +411,22 @@ index e0cd472..17ebe32 100644
  	/* Enable use of crypto hardware */
  	ENGINE_load_builtin_engines();
 diff --git a/regress/unittests/test_helper/test_helper.c b/regress/unittests/test_helper/test_helper.c
-index 898732d..a46335d 100644
+index 898732d..83ca769 100644
 --- a/regress/unittests/test_helper/test_helper.c
 +++ b/regress/unittests/test_helper/test_helper.c
-@@ -149,6 +149,10 @@ main(int argc, char **argv)
- {
- 	int ch;
- 
+@@ -202,6 +202,12 @@ main(int argc, char **argv)
+ 			exit(1);
+ 		}
+ 	}
 +#ifdef USING_WOLFSSL
-+    wolfSSL_Debugging_ON();
++	/* After getopt so it follows -v/-q. */
++	if (verbose_mode)
++		wolfSSL_Debugging_ON();
 +#endif
 +
- 	seed_rng();
- #ifdef WITH_OPENSSL
- 	OPENSSL_init_crypto(OPENSSL_INIT_LOAD_CRYPTO_STRINGS, NULL);
+ 	setvbuf(stdout, NULL, _IONBF, 0);
+ 	if (!quiet_mode)
+ 		printf("%s: ", __progname);
 diff --git a/sshkey.c b/sshkey.c
 index a590529..b0fc010 100644
 --- a/sshkey.c
