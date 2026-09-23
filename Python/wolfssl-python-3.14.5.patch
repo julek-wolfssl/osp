@@ -1,4 +1,4 @@
-From f6bbfe97527c449e99212825e316db6ebc06e57b Mon Sep 17 00:00:00 2001
+From 32e0592254a43df4bcb56487a95ff925fe85d684 Mon Sep 17 00:00:00 2001
 From: Juliusz Sosinowicz <juliusz@wolfssl.com>
 Date: Fri, 4 Sep 2026 09:30:42 +0000
 Subject: [PATCH] wolfSSL Patch for Python 3.14.5
@@ -66,7 +66,7 @@ Changes compared to the 3.13.7 patch:
  Lib/test/certdata/capath-2048-plus/ceff1710.0 |   27 +
  Lib/test/support/__init__.py                  |    3 +-
  Lib/test/test_asyncio/test_events.py          |   29 +-
- Lib/test/test_asyncio/test_ssl.py             |   14 +-
+ Lib/test/test_asyncio/test_ssl.py             |   26 +-
  Lib/test/test_httplib.py                      |   18 +-
  Lib/test/test_imaplib.py                      |    4 +
  Lib/test/test_poplib.py                       |    3 +-
@@ -76,8 +76,8 @@ Changes compared to the 3.13.7 patch:
  Modules/_ssl.c                                |  186 +-
  Modules/_ssl.h                                |    4 +
  Modules/_ssl_data_wolfssl.h                   | 6358 +++++++++++++++++
- configure.ac                                  |   48 +-
- 18 files changed, 7095 insertions(+), 140 deletions(-)
+ configure.ac                                  |   50 +-
+ 18 files changed, 7107 insertions(+), 142 deletions(-)
  create mode 100644 Lib/test/certdata/capath-2048-plus/5ed36f99.0
  create mode 100644 Lib/test/certdata/capath-2048-plus/99d0fa06.0
  create mode 100644 Lib/test/certdata/capath-2048-plus/b1930218.0
@@ -332,22 +332,27 @@ index 919d543..49a646f 100644
          )""", re.X)
          with mock.patch.object(self.loop, 'call_exception_handler'):
 diff --git a/Lib/test/test_asyncio/test_ssl.py b/Lib/test/test_asyncio/test_ssl.py
-index ca15fc3..ceb28e2 100644
+index ca15fc3..935833c 100644
 --- a/Lib/test/test_asyncio/test_ssl.py
 +++ b/Lib/test/test_asyncio/test_ssl.py
-@@ -1345,8 +1345,10 @@ def server(sock):
+@@ -1345,8 +1345,14 @@ def server(sock):
              time.sleep(0.2)  # wait for the peer to fill its backlog
  
              # send close_notify but don't wait for response
 -            with self.assertRaises(ssl.SSLWantReadError):
-+            try:
-                 sslobj.unwrap()
-+            except ssl.SSLWantReadError:
-+                pass
+-                sslobj.unwrap()
++            if ssl.IS_WOLFSSL:
++                try:
++                    sslobj.unwrap()
++                except ssl.SSLWantReadError:
++                    pass
++            else:
++                with self.assertRaises(ssl.SSLWantReadError):
++                    sslobj.unwrap()
              sock.send(outgoing.read())
  
              # should receive all data
-@@ -1363,7 +1365,8 @@ def server(sock):
+@@ -1363,7 +1369,8 @@ def server(sock):
              self.assertEqual(data_len, CHUNK * SIZE)
  
              # verify that close_notify is received
@@ -357,19 +362,24 @@ index ca15fc3..ceb28e2 100644
  
              sock.close()
  
-@@ -1477,8 +1480,10 @@ def server(sock):
+@@ -1477,8 +1484,14 @@ def server(sock):
              time.sleep(0.2)  # wait for the peer to fill its backlog
  
              # send close_notify but don't wait for response
 -            with self.assertRaises(ssl.SSLWantReadError):
-+            try:
-                 sslobj.unwrap()
-+            except ssl.SSLWantReadError:
-+                pass
+-                sslobj.unwrap()
++            if ssl.IS_WOLFSSL:
++                try:
++                    sslobj.unwrap()
++                except ssl.SSLWantReadError:
++                    pass
++            else:
++                with self.assertRaises(ssl.SSLWantReadError):
++                    sslobj.unwrap()
              sock.send(outgoing.read())
  
              # should receive all data
-@@ -1495,7 +1500,8 @@ def server(sock):
+@@ -1495,7 +1508,8 @@ def server(sock):
              self.assertEqual(data_len, CHUNK * SIZE*2)
  
              # verify that close_notify is received
@@ -8097,7 +8107,7 @@ index 0000000..3df336a
 +    { NULL }
 +};
 diff --git a/configure.ac b/configure.ac
-index 87c0ead..f006fb3 100644
+index 87c0ead..8002567 100644
 --- a/configure.ac
 +++ b/configure.ac
 @@ -12,7 +12,7 @@ dnl
@@ -8109,7 +8119,7 @@ index 87c0ead..f006fb3 100644
  
  AC_INIT([python],[PYTHON_VERSION],[https://github.com/python/cpython/issues/])
  
-@@ -7449,8 +7449,47 @@ WITH_SAVE_ENV([
+@@ -7449,8 +7449,49 @@ WITH_SAVE_ENV([
    _RESTORE_VAR([ac_includes_default])
  ])
  
@@ -8119,6 +8129,7 @@ index 87c0ead..f006fb3 100644
 +            AS_HELP_STRING([--with-wolfssl=DIR],
 +                           [build with wolfSSL at DIR instead of OpenSSL]),
 +[
++  AS_VAR_IF([withval], [no], [USE_WOLFSSL=no], [
 +    OPENSSL_INCLUDES="-I${withval}/include/wolfssl -I${withval}/include/"
 +    OPENSSL_LDFLAGS="-L${withval}/lib"
 +    OPENSSL_LIBS="-lwolfssl"
@@ -8131,7 +8142,8 @@ index 87c0ead..f006fb3 100644
 +    LDFLAGS="$LDFLAGS $OPENSSL_LDFLAGS"
 +    LIBS="$LIBS $OPENSSL_LIBS"
 +
-+    USE_WOLFSSL=yes],
++    USE_WOLFSSL=yes
++  ])],
 +[
 +    USE_WOLFSSL=no
 +])
@@ -8159,7 +8171,7 @@ index 87c0ead..f006fb3 100644
  
  # rpath to libssl and libcrypto
  AS_VAR_IF([GNULD], [yes], [
-@@ -7518,6 +7557,8 @@ AS_VAR_IF([PY_UNSUPPORTED_OPENSSL_BUILD], [static], [
+@@ -7518,6 +7559,8 @@ AS_VAR_IF([PY_UNSUPPORTED_OPENSSL_BUILD], [static], [
    AC_MSG_RESULT([$OPENSSL_LIBS])
  ])
  
@@ -8168,7 +8180,7 @@ index 87c0ead..f006fb3 100644
  dnl AX_CHECK_OPENSSL does not export libcrypto-only libs
  LIBCRYPTO_LIBS=
  for arg in $OPENSSL_LIBS; do
-@@ -7574,6 +7615,7 @@ WITH_SAVE_ENV([
+@@ -7574,6 +7617,7 @@ WITH_SAVE_ENV([
      ])], [ac_cv_working_openssl_hashlib=yes], [ac_cv_working_openssl_hashlib=no])
    ])
  ])
