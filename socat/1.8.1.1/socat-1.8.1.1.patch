@@ -1,4 +1,4 @@
-From 850a4cde3f2994d5b4fc90bf2cff9f48caa64b05 Mon Sep 17 00:00:00 2001
+From bc5e11f67e6bdd634e57c4b1df774b08c3a95567 Mon Sep 17 00:00:00 2001
 From: Juliusz Sosinowicz <juliusz@wolfssl.com>
 Date: Mon, 7 Sep 2026 18:19:42 +0000
 Subject: [PATCH] Add wolfSSL support to socat 1.8.1.1
@@ -66,12 +66,12 @@ systemd-socket-activate dropping LD_LIBRARY_PATH. 304, 326, 399, 410,
 Test 318 OPENSSL_ANULL needs a wolfSSL with the "aNULL" cipher list fix
 to handshake, but upstream test.sh counts that test as ok either way.
 ---
- configure.ac  | 703 +++++++++++++++++++++++++++++---------------------
+ configure.ac  | 706 +++++++++++++++++++++++++++++---------------------
  xio-openssl.c |  31 ++-
- 2 files changed, 431 insertions(+), 303 deletions(-)
+ 2 files changed, 434 insertions(+), 303 deletions(-)
 
 diff --git a/configure.ac b/configure.ac
-index 218db56..4b8453f 100644
+index 218db56..48d8ce3 100644
 --- a/configure.ac
 +++ b/configure.ac
 @@ -66,13 +66,13 @@ AC_CHECK_HEADERS(fcntl.h limits.h strings.h sys/param.h sys/ioctl.h sys/time.h s
@@ -567,7 +567,7 @@ index 218db56..4b8453f 100644
        break
      else
        AC_MSG_RESULT(no)
-@@ -666,6 +666,82 @@ if test -n "$WITH_READLINE"; then
+@@ -666,6 +666,85 @@ if test -n "$WITH_READLINE"; then
    fi
  fi
  
@@ -576,70 +576,73 @@ index 218db56..4b8453f 100644
 +AC_ARG_WITH(wolfssl,
 +    [  --with-wolfssl=PATH     PATH to wolfssl install (default /usr/local) ],
 +    [
-+        if test "x$withval" != "xno"; then
-+           if test -d "$withval/lib"; then
-+                LDFLAGS="-L${withval}/lib ${LDFLAGS}"
-+           fi
-+           if test -d "$withval/include"; then
-+               CPPFLAGS="$CPPFLAGS -I${withval}/include -I${withval}/include/wolfssl"
-+           fi
-+        fi
-+        if test "x$withval" == "xyes" ; then
-+            LDFLAGS="-L/usr/local/lib $LDFLAGS"
-+            CPPFLAGS="-I/usr/local/include -I/usr/local/include/wolfssl $CPPFLAGS"
-+        fi
-+        LIBS="$LIBS -lwolfssl"
-+        CPPFLAGS="$CPPFLAGS -DWOLFSSL_USE_OPTIONS_H"
-+
-+        AC_MSG_RESULT([yes])
-+        WITH_WOLFSSL=yes
-+
-+        AC_DEFINE([WITH_WOLFSSL],[1],[ ])
-+        AC_DEFINE([WITH_OPENSSL],[1],[ ])
-+        AC_DEFINE([WITH_OPENSSL_METHOD],[1],[ ])
-+
-+        # Note that we are disabling compression when using wolfSSL.
-+        AC_DEFINE([OPENSSL_NO_COMP],[1],[ ])
-+
-+        AC_CHECK_FUNC([wolfTLS_client_method],             [AC_DEFINE([HAVE_TLS_client_method],[1],[ ])], [ ])
-+        AC_CHECK_FUNC([wolfTLS_server_method],             [AC_DEFINE([HAVE_TLS_server_method],[1],[ ])], [ ])
-+        AC_CHECK_FUNC([wolfDTLS_client_method],            [AC_DEFINE([HAVE_DTLS_client_method],[1],[ ])], [ ])
-+        AC_CHECK_FUNC([wolfDTLS_server_method],            [AC_DEFINE([HAVE_DTLS_server_method],[1],[ ])], [ ])
-+        AC_CHECK_FUNC([wolfSSLv2_client_method],           [AC_DEFINE([HAVE_SSLv2_client_method],[1],[ ])], [ ])
-+        AC_CHECK_FUNC([wolfSSLv2_server_method],           [AC_DEFINE([HAVE_SSLv2_server_method],[1],[ ])], [ ])
-+        AC_CHECK_FUNC([wolfSSLv3_client_method],           [AC_DEFINE([HAVE_SSLv3_client_method],[1],[ ])], [ ])
-+        AC_CHECK_FUNC([wolfSSLv3_server_method],           [AC_DEFINE([HAVE_SSLv3_server_method],[1],[ ])], [ ])
-+        AC_CHECK_FUNC([wolfSSLv23_client_method],          [AC_DEFINE([HAVE_SSLv23_client_method],[1],[ ])], [ ])
-+        AC_CHECK_FUNC([wolfSSLv23_server_method],          [AC_DEFINE([HAVE_SSLv23_server_method],[1],[ ])], [ ])
-+        AC_CHECK_FUNC([wolfTLSv1_client_method],           [AC_DEFINE([HAVE_TLSv1_client_method],[1],[ ])], [ ])
-+        AC_CHECK_FUNC([wolfTLSv1_server_method],           [AC_DEFINE([HAVE_TLSv1_server_method],[1],[ ])], [ ])
-+        AC_CHECK_FUNC([wolfTLSv1_1_client_method],         [AC_DEFINE([HAVE_TLSv1_1_client_method],[1],[ ])], [ ])
-+        AC_CHECK_FUNC([wolfTLSv1_1_server_method],         [AC_DEFINE([HAVE_TLSv1_1_server_method],[1],[ ])], [ ])
-+        AC_CHECK_FUNC([wolfTLSv1_2_client_method],         [AC_DEFINE([HAVE_TLSv1_2_client_method],[1],[ ])], [ ])
-+        AC_CHECK_FUNC([wolfTLSv1_2_server_method],         [AC_DEFINE([HAVE_TLSv1_2_server_method],[1],[ ])], [ ])
-+        AC_CHECK_FUNC([wolfDTLSv1_client_method],          [AC_DEFINE([HAVE_DTLSv1_client_method],[1],[ ])], [ ])
-+        AC_CHECK_FUNC([wolfDTLSv1_server_method],          [AC_DEFINE([HAVE_DTLSv1_server_method],[1],[ ])], [ ])
-+        AC_CHECK_FUNC([wolfDTLSv1_2_client_method],        [AC_DEFINE([HAVE_DTLSv1_2_client_method],[1],[ ])], [ ])
-+        AC_CHECK_FUNC([wolfDTLSv1_2_server_method],        [AC_DEFINE([HAVE_DTLSv1_2_server_method],[1],[ ])], [ ])
-+        AC_CHECK_FUNC([wolfSSL_RAND_egd],                  [AC_DEFINE([HAVE_RAND_egd],[1],[ ])], [ ])
-+        AC_CHECK_FUNC([wolfSSL_DH_set0_pqg],               [AC_DEFINE([HAVE_DH_set0_pqg],[1],[ ])], [ ])
-+        AC_CHECK_FUNC([wolfSSL_ASN1_STRING_data],          [AC_DEFINE([HAVE_ASN1_STRING_get0_data],[1],[ ])], [ ])
-+        AC_CHECK_FUNC([wolfSSL_RAND_status],               [AC_DEFINE([HAVE_RAND_status],[1],[ ])], [ ])
-+        AC_CHECK_FUNC([wolfSSL_set_tlsext_host_name],      [AC_DEFINE([HAVE_SSL_set_tlsext_host_name],[1],[ ])], [ ])
-+        AC_CHECK_FUNC([wolfSSL_library_init],              [AC_DEFINE([HAVE_SSL_library_init],[1],[ ])], [ ])
-+        AC_CHECK_FUNC([wolfSSL_OPENSSL_init_ssl],          [AC_DEFINE([HAVE_OPENSSL_init_ssl],[1],[ ])], [ ])
-+        AC_CHECK_FUNC([wolfSSL_ERR_error_string],          [AC_DEFINE([HAVE_ERR_error_string],[1],[ ])], [ ])
-+        AC_CHECK_FUNC([wolfSSL_CTX_set_min_proto_version], [AC_DEFINE([HAVE_SSL_CTX_set_min_proto_version],[1],[ ])], [ ])
-+        AC_CHECK_FUNC([wolfSSL_CTX_set_max_proto_version], [AC_DEFINE([HAVE_SSL_CTX_set_max_proto_version],[1],[ ])], [ ])
-+
-+        AC_MSG_CHECKING(for type WOLFSSL_EC_KEY)
-+        AC_TRY_COMPILE([#include <wolfssl/openssl/ec.h>], [EC_KEY *s;], [HAVE_TYPE_EC_KEY=yes], [HAVE_TYPE_EC_KEY=no])
-+        if test "$HAVE_TYPE_EC_KEY" = "yes"
-+        then
-+           AC_DEFINE([HAVE_TYPE_EC_KEY],[1],[ ])
-+           AC_MSG_RESULT([yes])
++        if test "x$withval" = "xno"; then
++            AC_MSG_RESULT([no])
++            WITH_WOLFSSL=no
 +        else
-+           AC_MSG_RESULT([no])
++            if test -d "$withval/lib"; then
++                LDFLAGS="-L${withval}/lib ${LDFLAGS}"
++            fi
++            if test -d "$withval/include"; then
++                CPPFLAGS="$CPPFLAGS -I${withval}/include -I${withval}/include/wolfssl"
++            fi
++            if test "x$withval" == "xyes" ; then
++                LDFLAGS="-L/usr/local/lib $LDFLAGS"
++                CPPFLAGS="-I/usr/local/include -I/usr/local/include/wolfssl $CPPFLAGS"
++            fi
++            LIBS="$LIBS -lwolfssl"
++            CPPFLAGS="$CPPFLAGS -DWOLFSSL_USE_OPTIONS_H"
++
++            AC_MSG_RESULT([yes])
++            WITH_WOLFSSL=yes
++
++            AC_DEFINE([WITH_WOLFSSL],[1],[ ])
++            AC_DEFINE([WITH_OPENSSL],[1],[ ])
++            AC_DEFINE([WITH_OPENSSL_METHOD],[1],[ ])
++
++            # Note that we are disabling compression when using wolfSSL.
++            AC_DEFINE([OPENSSL_NO_COMP],[1],[ ])
++
++            AC_CHECK_FUNC([wolfTLS_client_method],             [AC_DEFINE([HAVE_TLS_client_method],[1],[ ])], [ ])
++            AC_CHECK_FUNC([wolfTLS_server_method],             [AC_DEFINE([HAVE_TLS_server_method],[1],[ ])], [ ])
++            AC_CHECK_FUNC([wolfDTLS_client_method],            [AC_DEFINE([HAVE_DTLS_client_method],[1],[ ])], [ ])
++            AC_CHECK_FUNC([wolfDTLS_server_method],            [AC_DEFINE([HAVE_DTLS_server_method],[1],[ ])], [ ])
++            AC_CHECK_FUNC([wolfSSLv2_client_method],           [AC_DEFINE([HAVE_SSLv2_client_method],[1],[ ])], [ ])
++            AC_CHECK_FUNC([wolfSSLv2_server_method],           [AC_DEFINE([HAVE_SSLv2_server_method],[1],[ ])], [ ])
++            AC_CHECK_FUNC([wolfSSLv3_client_method],           [AC_DEFINE([HAVE_SSLv3_client_method],[1],[ ])], [ ])
++            AC_CHECK_FUNC([wolfSSLv3_server_method],           [AC_DEFINE([HAVE_SSLv3_server_method],[1],[ ])], [ ])
++            AC_CHECK_FUNC([wolfSSLv23_client_method],          [AC_DEFINE([HAVE_SSLv23_client_method],[1],[ ])], [ ])
++            AC_CHECK_FUNC([wolfSSLv23_server_method],          [AC_DEFINE([HAVE_SSLv23_server_method],[1],[ ])], [ ])
++            AC_CHECK_FUNC([wolfTLSv1_client_method],           [AC_DEFINE([HAVE_TLSv1_client_method],[1],[ ])], [ ])
++            AC_CHECK_FUNC([wolfTLSv1_server_method],           [AC_DEFINE([HAVE_TLSv1_server_method],[1],[ ])], [ ])
++            AC_CHECK_FUNC([wolfTLSv1_1_client_method],         [AC_DEFINE([HAVE_TLSv1_1_client_method],[1],[ ])], [ ])
++            AC_CHECK_FUNC([wolfTLSv1_1_server_method],         [AC_DEFINE([HAVE_TLSv1_1_server_method],[1],[ ])], [ ])
++            AC_CHECK_FUNC([wolfTLSv1_2_client_method],         [AC_DEFINE([HAVE_TLSv1_2_client_method],[1],[ ])], [ ])
++            AC_CHECK_FUNC([wolfTLSv1_2_server_method],         [AC_DEFINE([HAVE_TLSv1_2_server_method],[1],[ ])], [ ])
++            AC_CHECK_FUNC([wolfDTLSv1_client_method],          [AC_DEFINE([HAVE_DTLSv1_client_method],[1],[ ])], [ ])
++            AC_CHECK_FUNC([wolfDTLSv1_server_method],          [AC_DEFINE([HAVE_DTLSv1_server_method],[1],[ ])], [ ])
++            AC_CHECK_FUNC([wolfDTLSv1_2_client_method],        [AC_DEFINE([HAVE_DTLSv1_2_client_method],[1],[ ])], [ ])
++            AC_CHECK_FUNC([wolfDTLSv1_2_server_method],        [AC_DEFINE([HAVE_DTLSv1_2_server_method],[1],[ ])], [ ])
++            AC_CHECK_FUNC([wolfSSL_RAND_egd],                  [AC_DEFINE([HAVE_RAND_egd],[1],[ ])], [ ])
++            AC_CHECK_FUNC([wolfSSL_DH_set0_pqg],               [AC_DEFINE([HAVE_DH_set0_pqg],[1],[ ])], [ ])
++            AC_CHECK_FUNC([wolfSSL_ASN1_STRING_data],          [AC_DEFINE([HAVE_ASN1_STRING_get0_data],[1],[ ])], [ ])
++            AC_CHECK_FUNC([wolfSSL_RAND_status],               [AC_DEFINE([HAVE_RAND_status],[1],[ ])], [ ])
++            AC_CHECK_FUNC([wolfSSL_set_tlsext_host_name],      [AC_DEFINE([HAVE_SSL_set_tlsext_host_name],[1],[ ])], [ ])
++            AC_CHECK_FUNC([wolfSSL_library_init],              [AC_DEFINE([HAVE_SSL_library_init],[1],[ ])], [ ])
++            AC_CHECK_FUNC([wolfSSL_OPENSSL_init_ssl],          [AC_DEFINE([HAVE_OPENSSL_init_ssl],[1],[ ])], [ ])
++            AC_CHECK_FUNC([wolfSSL_ERR_error_string],          [AC_DEFINE([HAVE_ERR_error_string],[1],[ ])], [ ])
++            AC_CHECK_FUNC([wolfSSL_CTX_set_min_proto_version], [AC_DEFINE([HAVE_SSL_CTX_set_min_proto_version],[1],[ ])], [ ])
++            AC_CHECK_FUNC([wolfSSL_CTX_set_max_proto_version], [AC_DEFINE([HAVE_SSL_CTX_set_max_proto_version],[1],[ ])], [ ])
++
++            AC_MSG_CHECKING(for type WOLFSSL_EC_KEY)
++            AC_TRY_COMPILE([#include <wolfssl/openssl/ec.h>], [EC_KEY *s;], [HAVE_TYPE_EC_KEY=yes], [HAVE_TYPE_EC_KEY=no])
++            if test "$HAVE_TYPE_EC_KEY" = "yes"
++            then
++               AC_DEFINE([HAVE_TYPE_EC_KEY],[1],[ ])
++               AC_MSG_RESULT([yes])
++            else
++               AC_MSG_RESULT([no])
++            fi
 +        fi
 +    ],
 +    [AC_MSG_RESULT([no]); WITH_WOLFSSL=no]
@@ -650,7 +653,7 @@ index 218db56..4b8453f 100644
  AC_MSG_CHECKING(whether to include openssl support)
  AC_ARG_ENABLE(openssl, [  --disable-openssl       disable OpenSSL support],
    [ case "$enableval" in
-@@ -699,12 +775,13 @@ if test -n "$WITH_OPENSSL"; then
+@@ -699,12 +778,13 @@ if test -n "$WITH_OPENSSL"; then
      ])
    ])
    if test "$sc_cv_have_openssl_ssl_h" = "yes"; then
@@ -665,7 +668,7 @@ index 218db56..4b8453f 100644
  
  #if test -n "$WITH_OPENSSL"; then
  #  AC_CHECK_FUNCS(OPENSSL_init_ssl, SSL_library_init)
-@@ -739,7 +816,7 @@ if test -n "$WITH_OPENSSL" -a "$sc_cv_have_openssl_ssl_h" = 'yes'; then
+@@ -739,7 +819,7 @@ if test -n "$WITH_OPENSSL" -a "$sc_cv_have_openssl_ssl_h" = 'yes'; then
      ]
    )
    if test "$sc_cv_have_libssl" = 'yes'; then
@@ -674,7 +677,7 @@ index 218db56..4b8453f 100644
    fi
    AC_MSG_RESULT($sc_cv_have_libssl)
  fi
-@@ -767,7 +844,7 @@ fi
+@@ -767,7 +847,7 @@ fi
  #fi
  if test -n "$WITH_OPENSSL"; then
    if test "$sc_cv_have_openssl_ssl_h" = "yes" -a "$sc_cv_have_libssl" = "yes"; then
@@ -683,7 +686,7 @@ index 218db56..4b8453f 100644
    else
      AC_MSG_WARN([not all components of OpenSSL found, disabling it]);
    fi
-@@ -775,11 +852,11 @@ fi
+@@ -775,11 +855,11 @@ fi
  
  # Guarded for OpenBSD
  AC_CHECK_FUNCS(OPENSSL_init_ssl SSL_library_init OPENSSL_INIT_new)
@@ -697,7 +700,7 @@ index 218db56..4b8453f 100644
  #     FOUND_SSL_LIB="no"
  #     AC_CHECK_LIB(ssl, OPENSSL_init_ssl, [FOUND_SSL_LIB="yes"])
  #     AC_CHECK_LIB(ssl, SSL_library_init, [FOUND_SSL_LIB="yes"])
-@@ -792,7 +869,7 @@ AC_MSG_CHECKING(whether to include OpenSSL method option)
+@@ -792,7 +872,7 @@ AC_MSG_CHECKING(whether to include OpenSSL method option)
  AC_ARG_ENABLE(openssl-method, [  --enable-openssl-method       enable OpenSSL method option],
  	      [case "$enableval" in
  	       no) AC_MSG_RESULT(no);;
@@ -706,7 +709,7 @@ index 218db56..4b8453f 100644
  	       esac],
  	       [AC_MSG_RESULT(no)])
  fi
-@@ -801,38 +878,41 @@ AC_MSG_CHECKING(whether to include undocumented resolver related options)
+@@ -801,38 +881,41 @@ AC_MSG_CHECKING(whether to include undocumented resolver related options)
  AC_ARG_ENABLE(resolve, [  --enable-resolve       enable undocumented resolver options],
  	      [case "$enableval" in
  	       no) AC_MSG_RESULT(no);;
@@ -770,7 +773,7 @@ index 218db56..4b8453f 100644
  fi
  
  if test -n "$WITH_FIPS"; then
-@@ -856,7 +936,7 @@ if test -n "$WITH_FIPS"; then
+@@ -856,7 +939,7 @@ if test -n "$WITH_FIPS"; then
      )]
    )
    if test "$sv_cv_have_openssl_fips_h" = "yes"; then
@@ -779,7 +782,7 @@ index 218db56..4b8453f 100644
    fi
    AC_MSG_NOTICE(checked for openssl/fips.h... $sc_cv_have_openssl_ssl_h)
  fi
-@@ -887,15 +967,15 @@ if test -n "$WITH_FIPS" -a "$sc_cv_have_openssl_fips_h" = 'yes'; then
+@@ -887,15 +970,15 @@ if test -n "$WITH_FIPS" -a "$sc_cv_have_openssl_fips_h" = 'yes'; then
      ]
    )
    if test "$sc_cv_have_libcrypto" = 'yes'; then
@@ -798,7 +801,7 @@ index 218db56..4b8453f 100644
    else
      AC_MSG_WARN([not all components of OpenSSL FIPS found, disabling it]);
    fi
-@@ -916,12 +996,12 @@ if ! test "$ac_cv_header_linux_if_tun_h" = 'yes'; then
+@@ -916,12 +999,12 @@ if ! test "$ac_cv_header_linux_if_tun_h" = 'yes'; then
  fi
  #
  if test -n "$WITH_TUN"; then
@@ -813,7 +816,7 @@ index 218db56..4b8453f 100644
      [WITH_INTERFACE=;
       AC_MSG_WARN([include file netinet/if_ether.h not found, disabling interface])],
       [AC_INCLUDES_DEFAULT
-@@ -933,17 +1013,17 @@ fi
+@@ -933,17 +1016,17 @@ fi
  
  if test "$WITH_INTERFACE" || test "$WITH_TUN"; then
    AC_CHECK_HEADER(linux/if_packet.h,
@@ -834,7 +837,7 @@ index 218db56..4b8453f 100644
  	#if HAVE_ASM_TYPES_H
  	#include <asm/types.h>
  	#endif])
-@@ -954,10 +1034,10 @@ AC_MSG_CHECKING(whether to include system call tracing)
+@@ -954,10 +1037,10 @@ AC_MSG_CHECKING(whether to include system call tracing)
  AC_ARG_ENABLE(sycls, [  --disable-sycls         disable system call tracing],
  	      [case "$enableval" in
  	       no) SYCLS=""; SSLCLS=""; AC_MSG_RESULT(no);;
@@ -847,7 +850,7 @@ index 218db56..4b8453f 100644
  		 SYCLS="sycls.c"; SSLCLS="sslcls.c"; AC_MSG_RESULT(yes)])
  AC_SUBST(SYCLS)
  AC_SUBST(SSLCLS)
-@@ -966,23 +1046,23 @@ AC_MSG_CHECKING(whether to include file descriptor analyzer)
+@@ -966,23 +1049,23 @@ AC_MSG_CHECKING(whether to include file descriptor analyzer)
  AC_ARG_ENABLE(filan, [  --disable-filan         disable file descriptor analyzer],
  	      [case "$enableval" in
  	       no) FILAN=""; AC_MSG_RESULT(no);;
@@ -876,7 +879,7 @@ index 218db56..4b8453f 100644
  	       *)  AC_MSG_RESULT(no) ;;
  	       esac],
  	       [AC_MSG_RESULT(no)])
-@@ -991,26 +1071,26 @@ AC_ARG_ENABLE(devtests, [  --enable-devtests          enable devtests support],
+@@ -991,26 +1074,26 @@ AC_ARG_ENABLE(devtests, [  --enable-devtests          enable devtests support],
  AC_MSG_CHECKING(included message level)
  AC_ARG_ENABLE(msglevel, [  --enable-msglevel=N     set max verbosity to debug,info,notice,warn,error,fatal],
  	      [case "$enableval" in
@@ -917,7 +920,7 @@ index 218db56..4b8453f 100644
  
  
  #AC_SUBST(V_INCL)
-@@ -1028,7 +1108,7 @@ AC_STRUCT_ST_RDEV
+@@ -1028,7 +1111,7 @@ AC_STRUCT_ST_RDEV
  AC_HEADER_TIME
  
  dnl Check for extra realtime library (for Solaris)
@@ -926,7 +929,7 @@ index 218db56..4b8453f 100644
  #AC_CHECK_FUNC(nanosleep, , AC_CHECK_LIB(rt, nanosleep))
  
  dnl Checks for library functions.
-@@ -1064,15 +1144,15 @@ AC_CHECK_PROTOTYPE_LIB(ptsname)
+@@ -1064,15 +1147,15 @@ AC_CHECK_PROTOTYPE_LIB(ptsname)
  
  AC_MSG_CHECKING(for long long)
  AC_CACHE_VAL(sc_cv_type_longlong,
@@ -945,7 +948,7 @@ index 218db56..4b8453f 100644
  
  AC_MSG_CHECKING(for bool)
  AC_CACHE_VAL(sc_cv_type_bool,
-@@ -1083,7 +1163,7 @@ AC_CACHE_VAL(sc_cv_type_bool,
+@@ -1083,7 +1166,7 @@ AC_CACHE_VAL(sc_cv_type_bool,
  [sc_cv_type_bool=yes],
  [sc_cv_type_bool=no])])
  if test $sc_cv_type_bool = yes; then
@@ -954,7 +957,7 @@ index 218db56..4b8453f 100644
  fi
  AC_MSG_RESULT($sc_cv_type_bool)
  
-@@ -1099,7 +1179,7 @@ AC_CACHE_VAL(sc_cv_type_socklen,
+@@ -1099,7 +1182,7 @@ AC_CACHE_VAL(sc_cv_type_socklen,
  [sc_cv_type_socklen=yes],
  [sc_cv_type_socklen=no])])
  if test $sc_cv_type_socklen = yes; then
@@ -963,7 +966,7 @@ index 218db56..4b8453f 100644
  fi
  AC_MSG_RESULT($sc_cv_type_socklen)
  
-@@ -1109,7 +1189,7 @@ AC_CACHE_VAL(sc_cv_type_stat64,
+@@ -1109,7 +1192,7 @@ AC_CACHE_VAL(sc_cv_type_stat64,
  [sc_cv_type_stat64=yes],
  [sc_cv_type_stat64=no])])
  if test $sc_cv_type_stat64 = yes; then
@@ -972,7 +975,7 @@ index 218db56..4b8453f 100644
  fi
  AC_MSG_RESULT($sc_cv_type_stat64)
  
-@@ -1119,7 +1199,7 @@ AC_CACHE_VAL(sc_cv_type_off64,
+@@ -1119,7 +1202,7 @@ AC_CACHE_VAL(sc_cv_type_off64,
  [sc_cv_type_off64=yes],
  [sc_cv_type_off64=no])])
  if test $sc_cv_type_off64 = yes; then
@@ -981,7 +984,7 @@ index 218db56..4b8453f 100644
  fi
  AC_MSG_RESULT($sc_cv_type_off64)
  
-@@ -1129,7 +1209,7 @@ AC_CACHE_VAL(sc_cv_type_sighandler,
+@@ -1129,7 +1212,7 @@ AC_CACHE_VAL(sc_cv_type_sighandler,
  [sc_cv_type_sighandler=yes],
  [sc_cv_type_sighandler=no])])
  if test $sc_cv_type_sighandler = yes; then
@@ -990,7 +993,7 @@ index 218db56..4b8453f 100644
  fi
  AC_MSG_RESULT($sc_cv_type_socklen)
  
-@@ -1147,7 +1227,7 @@ AC_CACHE_VAL(sc_cv_type_uint8,
+@@ -1147,7 +1230,7 @@ AC_CACHE_VAL(sc_cv_type_uint8,
  [sc_cv_type_uint8=yes],
  [sc_cv_type_uint8=no])])
  if test $sc_cv_type_uint8 = yes; then
@@ -999,7 +1002,7 @@ index 218db56..4b8453f 100644
  fi
  AC_MSG_RESULT($sc_cv_type_uint8)
  
-@@ -1165,7 +1245,7 @@ AC_CACHE_VAL(sc_cv_type_uint16,
+@@ -1165,7 +1248,7 @@ AC_CACHE_VAL(sc_cv_type_uint16,
  [sc_cv_type_uint16=yes],
  [sc_cv_type_uint16=no])])
  if test $sc_cv_type_uint16 = yes; then
@@ -1008,7 +1011,7 @@ index 218db56..4b8453f 100644
  fi
  AC_MSG_RESULT($sc_cv_type_uint16)
  
-@@ -1183,7 +1263,7 @@ AC_CACHE_VAL(sc_cv_type_uint32,
+@@ -1183,7 +1266,7 @@ AC_CACHE_VAL(sc_cv_type_uint32,
  [sc_cv_type_uint32=yes],
  [sc_cv_type_uint32=no])])
  if test $sc_cv_type_uint32 = yes; then
@@ -1017,7 +1020,7 @@ index 218db56..4b8453f 100644
  fi
  AC_MSG_RESULT($sc_cv_type_uint32)
  
-@@ -1201,7 +1281,7 @@ AC_CACHE_VAL(sc_cv_type_uint64,
+@@ -1201,7 +1284,7 @@ AC_CACHE_VAL(sc_cv_type_uint64,
  [sc_cv_type_uint64=yes],
  [sc_cv_type_uint64=no])])
  if test $sc_cv_type_uint64 = yes; then
@@ -1026,7 +1029,7 @@ index 218db56..4b8453f 100644
  fi
  AC_MSG_RESULT($sc_cv_type_uint64)
  
-@@ -1222,7 +1302,7 @@ AC_TRY_COMPILE([#include <sys/types.h>
+@@ -1222,7 +1305,7 @@ AC_TRY_COMPILE([#include <sys/types.h>
  #include <sys/select.h>
  #endif],
  [fd_set s; s.fds_bits[0]=0;],
@@ -1035,7 +1038,7 @@ index 218db56..4b8453f 100644
  [AC_MSG_RESULT(no);])
  
  AC_MSG_CHECKING(for struct termios . c_ispeed)
-@@ -1231,7 +1311,7 @@ AC_TRY_COMPILE([#include <unistd.h>
+@@ -1231,7 +1314,7 @@ AC_TRY_COMPILE([#include <unistd.h>
  #include <termios.h>
  #endif],
  [struct termios s; s.c_ispeed=0;],
@@ -1044,7 +1047,7 @@ index 218db56..4b8453f 100644
  [AC_MSG_RESULT(no);])
  
  AC_MSG_CHECKING(for struct termios . c_ospeed)
-@@ -1240,7 +1320,7 @@ AC_TRY_COMPILE([#include <unistd.h>
+@@ -1240,7 +1323,7 @@ AC_TRY_COMPILE([#include <unistd.h>
  #include <termios.h>
  #endif],
  [struct termios s; s.c_ospeed=0;],
@@ -1053,7 +1056,7 @@ index 218db56..4b8453f 100644
  [AC_MSG_RESULT(no);])
  
  AC_MSG_CHECKING(for sa_family_t)
-@@ -1251,7 +1331,7 @@ AC_CACHE_VAL(sc_cv_type_sa_family_t,
+@@ -1251,7 +1334,7 @@ AC_CACHE_VAL(sc_cv_type_sa_family_t,
  [sc_cv_type_sa_family_t=yes],
  [sc_cv_type_sa_family_t=no])])
  if test $sc_cv_type_sa_family_t = yes; then
@@ -1062,7 +1065,7 @@ index 218db56..4b8453f 100644
  fi
  AC_MSG_RESULT($sc_cv_type_sa_family_t)
  
-@@ -1267,7 +1347,7 @@ AC_CACHE_VAL(sc_cv_struct_sock_extended_err,
+@@ -1267,7 +1350,7 @@ AC_CACHE_VAL(sc_cv_struct_sock_extended_err,
  [sc_cv_struct_sock_extended_err=yes],
  [sc_cv_struct_sock_extended_err=no])])
  if test $sc_cv_struct_sock_extended_err = yes; then
@@ -1071,7 +1074,7 @@ index 218db56..4b8453f 100644
  fi
  AC_MSG_RESULT($sc_cv_struct_sock_extended_err)
  
-@@ -1277,7 +1357,7 @@ AC_CACHE_VAL(sc_cv_struct_sigaction_sa_sigaction,
+@@ -1277,7 +1360,7 @@ AC_CACHE_VAL(sc_cv_struct_sigaction_sa_sigaction,
  [sc_cv_struct_sigaction_sa_sigaction=yes],
  [sc_cv_struct_sigaction_sa_sigaction=no])])
  if test $sc_cv_struct_sigaction_sa_sigaction = yes; then
@@ -1080,7 +1083,7 @@ index 218db56..4b8453f 100644
  fi
  AC_MSG_RESULT($sc_cv_struct_sigaction_sa_sigaction)
  
-@@ -1296,7 +1376,7 @@ AC_CACHE_VAL(ac_cv_svid3,
+@@ -1296,7 +1379,7 @@ AC_CACHE_VAL(ac_cv_svid3,
   )]
  )])
  if test $ac_cv_svid3 = yes; then
@@ -1089,7 +1092,7 @@ index 218db56..4b8453f 100644
  fi
  AC_MSG_RESULT($ac_cv_svid3)
  
-@@ -1315,7 +1395,7 @@ AC_CACHE_VAL(ac_cv_xpg4_2,
+@@ -1315,7 +1398,7 @@ AC_CACHE_VAL(ac_cv_xpg4_2,
   )]
  )])
  if test $ac_cv_xpg4_2 = yes; then
@@ -1098,7 +1101,7 @@ index 218db56..4b8453f 100644
  fi
  AC_MSG_RESULT($ac_cv_xpg4_2)
  
-@@ -1337,7 +1417,7 @@ if test "$ac_cv_xpg4_2" = yes; then
+@@ -1337,7 +1420,7 @@ if test "$ac_cv_xpg4_2" = yes; then
    )]
   )])
   if test $ac_cv___extensions__ = yes; then
@@ -1107,7 +1110,7 @@ index 218db56..4b8453f 100644
   fi
   AC_MSG_RESULT($ac_cv___extensions__)
  fi
-@@ -1358,7 +1438,7 @@ if test "$ac_cv___extensions__" = yes; then
+@@ -1358,7 +1441,7 @@ if test "$ac_cv___extensions__" = yes; then
    )]
   )])
   if test $ac_cv__posix_pthread_semantics = yes; then
@@ -1116,7 +1119,7 @@ index 218db56..4b8453f 100644
   fi
   AC_MSG_RESULT($ac_cv__posix_pthread_semantics)
  fi
-@@ -1374,7 +1454,7 @@ AC_CACHE_VAL(sc_cv_struct_timespec,
+@@ -1374,7 +1457,7 @@ AC_CACHE_VAL(sc_cv_struct_timespec,
  [sc_cv_struct_timespec=yes],
  [sc_cv_struct_timespec=no])])
  if test $sc_cv_struct_timespec = yes; then
@@ -1125,7 +1128,7 @@ index 218db56..4b8453f 100644
  fi
  AC_MSG_RESULT($sc_cv_struct_timespec)
  
-@@ -1387,7 +1467,7 @@ AC_CACHE_VAL(sc_cv_struct_linger,
+@@ -1387,7 +1470,7 @@ AC_CACHE_VAL(sc_cv_struct_linger,
  [sc_cv_struct_linger=yes],
  [sc_cv_struct_linger=no])])
  if test $sc_cv_struct_linger = yes; then
@@ -1134,7 +1137,7 @@ index 218db56..4b8453f 100644
  fi
  AC_MSG_RESULT($sc_cv_struct_linger)
  
-@@ -1400,7 +1480,7 @@ AC_CACHE_VAL(sc_cv_struct_ip,
+@@ -1400,7 +1483,7 @@ AC_CACHE_VAL(sc_cv_struct_ip,
  [sc_cv_struct_ip=yes],
  [sc_cv_struct_ip=no])])
  if test $sc_cv_struct_ip = yes; then
@@ -1143,7 +1146,7 @@ index 218db56..4b8453f 100644
  fi
  AC_MSG_RESULT($sc_cv_struct_ip)
  
-@@ -1413,7 +1493,7 @@ AC_CACHE_VAL(sc_cv_struct_ip_mreq,
+@@ -1413,7 +1496,7 @@ AC_CACHE_VAL(sc_cv_struct_ip_mreq,
  [sc_cv_struct_ip_mreq=yes],
  [sc_cv_struct_ip_mreq=no])])
  if test $sc_cv_struct_ip_mreq = yes; then
@@ -1152,7 +1155,7 @@ index 218db56..4b8453f 100644
  fi
  AC_MSG_RESULT($sc_cv_struct_ip_mreq)
  
-@@ -1427,7 +1507,7 @@ AC_CACHE_VAL(sc_cv_struct_ip_mreqn,
+@@ -1427,7 +1510,7 @@ AC_CACHE_VAL(sc_cv_struct_ip_mreqn,
  [sc_cv_struct_ip_mreqn=yes],
  [sc_cv_struct_ip_mreqn=no])])
  if test $sc_cv_struct_ip_mreqn = yes; then
@@ -1161,7 +1164,7 @@ index 218db56..4b8453f 100644
  fi
  AC_MSG_RESULT($sc_cv_struct_ip_mreqn)
  
-@@ -1440,7 +1520,7 @@ AC_CACHE_VAL(sc_cv_struct_ipv6_mreq,
+@@ -1440,7 +1523,7 @@ AC_CACHE_VAL(sc_cv_struct_ipv6_mreq,
  [sc_cv_struct_ipv6_mreq=yes],
  [sc_cv_struct_ipv6_mreq=no])])
  if test $sc_cv_struct_ipv6_mreq = yes; then
@@ -1170,7 +1173,7 @@ index 218db56..4b8453f 100644
  fi
  AC_MSG_RESULT($sc_cv_struct_ipv6_mreq)
  
-@@ -1454,7 +1534,7 @@ AC_CACHE_VAL(sc_cv_struct_ip_mreq_source,
+@@ -1454,7 +1537,7 @@ AC_CACHE_VAL(sc_cv_struct_ip_mreq_source,
  [sc_cv_struct_ip_mreq_source=yes],
  [sc_cv_struct_ip_mreq_source=no])])
  if test $sc_cv_struct_ip_mreq_source = yes; then
@@ -1179,7 +1182,7 @@ index 218db56..4b8453f 100644
  fi
  AC_MSG_RESULT($sc_cv_struct_ip_mreqn)
  
-@@ -1468,7 +1548,7 @@ AC_CACHE_VAL(sc_cv_struct_group_source_req,
+@@ -1468,7 +1551,7 @@ AC_CACHE_VAL(sc_cv_struct_group_source_req,
  [sc_cv_struct_group_source_req=yes],
  [sc_cv_struct_group_source_req=no])])
  if test $sc_cv_struct_group_source_req = yes; then
@@ -1188,7 +1191,7 @@ index 218db56..4b8453f 100644
  fi
  AC_MSG_RESULT($sc_cv_struct_group_source_req)
  
-@@ -1482,7 +1562,7 @@ AC_CACHE_VAL(sc_cv_struct_ifreq,
+@@ -1482,7 +1565,7 @@ AC_CACHE_VAL(sc_cv_struct_ifreq,
  [sc_cv_struct_ifreq=yes],
  [sc_cv_struct_ifreq=no])])
  if test $sc_cv_struct_ifreq = yes; then
@@ -1197,7 +1200,7 @@ index 218db56..4b8453f 100644
  fi
  AC_MSG_RESULT($sc_cv_struct_ifreq)
  
-@@ -1497,7 +1577,7 @@ AC_CACHE_VAL(sc_cv_struct_ifreq_ifr_index,
+@@ -1497,7 +1580,7 @@ AC_CACHE_VAL(sc_cv_struct_ifreq_ifr_index,
  [sc_cv_struct_ifreq_ifr_index=yes],
  [sc_cv_struct_ifreq_ifr_index=no])])
  if test $sc_cv_struct_ifreq_ifr_index = yes; then
@@ -1206,7 +1209,7 @@ index 218db56..4b8453f 100644
  fi
  AC_MSG_RESULT($sc_cv_struct_ifreq_ifr_index)
  
-@@ -1512,7 +1592,7 @@ AC_CACHE_VAL(sc_cv_struct_ifreq_ifr_ifindex,
+@@ -1512,7 +1595,7 @@ AC_CACHE_VAL(sc_cv_struct_ifreq_ifr_ifindex,
  [sc_cv_struct_ifreq_ifr_ifindex=yes],
  [sc_cv_struct_ifreq_ifr_ifindex=no])])
  if test $sc_cv_struct_ifreq_ifr_ifindex = yes; then
@@ -1215,7 +1218,7 @@ index 218db56..4b8453f 100644
  fi
  AC_MSG_RESULT($sc_cv_struct_ifreq_ifr_ifindex)
  
-@@ -1527,7 +1607,7 @@ AC_CACHE_VAL(sc_cv_struct_sockaddr_salen,
+@@ -1527,7 +1610,7 @@ AC_CACHE_VAL(sc_cv_struct_sockaddr_salen,
  [sc_cv_struct_sockaddr_salen=yes],
  [sc_cv_struct_sockaddr_salen=no])])
  if test $sc_cv_struct_sockaddr_salen = yes; then
@@ -1224,7 +1227,7 @@ index 218db56..4b8453f 100644
  fi
  AC_MSG_RESULT($sc_cv_struct_sockaddr_salen)
  
-@@ -1538,31 +1618,31 @@ AC_TRY_COMPILE([#include <sys/types.h>
+@@ -1538,31 +1621,31 @@ AC_TRY_COMPILE([#include <sys/types.h>
  #include <netinet/in.h>],
  [struct sockaddr_in6 sa6;sa6.sin6_addr.s6_addr[0]=0;],
  [AC_MSG_RESULT(s6_addr);
@@ -1262,7 +1265,7 @@ index 218db56..4b8453f 100644
  
      [AC_MSG_RESULT([none or unknown])]
  )])])])])])
-@@ -1574,7 +1654,7 @@ AC_CACHE_VAL(sc_cv_struct_iovec,
+@@ -1574,7 +1657,7 @@ AC_CACHE_VAL(sc_cv_struct_iovec,
  [sc_cv_struct_iovec=yes],
  [sc_cv_struct_iovec=no])])
  if test $sc_cv_struct_iovec = yes; then
@@ -1271,7 +1274,7 @@ index 218db56..4b8453f 100644
  fi
  AC_MSG_RESULT($sc_cv_struct_iovec)
  
-@@ -1587,7 +1667,7 @@ AC_CACHE_VAL(sc_cv_struct_msghdr_msgcontrol,
+@@ -1587,7 +1670,7 @@ AC_CACHE_VAL(sc_cv_struct_msghdr_msgcontrol,
  [sc_cv_struct_msghdr_msgcontrol=yes],
  [sc_cv_struct_msghdr_msgcontrol=no])])
  if test $sc_cv_struct_msghdr_msgcontrol = yes; then
@@ -1280,7 +1283,7 @@ index 218db56..4b8453f 100644
  fi
  AC_MSG_RESULT($sc_cv_struct_msghdr_msgcontrol)
  
-@@ -1600,7 +1680,7 @@ AC_CACHE_VAL(sc_cv_struct_msghdr_msgcontrollen,
+@@ -1600,7 +1683,7 @@ AC_CACHE_VAL(sc_cv_struct_msghdr_msgcontrollen,
  [sc_cv_struct_msghdr_msgcontrollen=yes],
  [sc_cv_struct_msghdr_msgcontrollen=no])])
  if test $sc_cv_struct_msghdr_msgcontrollen = yes; then
@@ -1289,7 +1292,7 @@ index 218db56..4b8453f 100644
  fi
  AC_MSG_RESULT($sc_cv_struct_msghdr_msgcontrollen)
  
-@@ -1613,7 +1693,7 @@ AC_CACHE_VAL(sc_cv_struct_msghdr_msgflags,
+@@ -1613,7 +1696,7 @@ AC_CACHE_VAL(sc_cv_struct_msghdr_msgflags,
  [sc_cv_struct_msghdr_msgflags=yes],
  [sc_cv_struct_msghdr_msgflags=no])])
  if test $sc_cv_struct_msghdr_msgflags = yes; then
@@ -1298,7 +1301,7 @@ index 218db56..4b8453f 100644
  fi
  AC_MSG_RESULT($sc_cv_struct_msghdr_msgflags)
  
-@@ -1626,7 +1706,7 @@ AC_CACHE_VAL(sc_cv_struct_cmsghdr,
+@@ -1626,7 +1709,7 @@ AC_CACHE_VAL(sc_cv_struct_cmsghdr,
  [sc_cv_struct_cmsghdr=yes],
  [sc_cv_struct_cmsghdr=no])])
  if test $sc_cv_struct_cmsghdr = yes; then
@@ -1307,7 +1310,7 @@ index 218db56..4b8453f 100644
  fi
  AC_MSG_RESULT($sc_cv_struct_cmsghdr)
  
-@@ -1639,7 +1719,7 @@ AC_CACHE_VAL(sc_cv_struct_in_pktinfo,
+@@ -1639,7 +1722,7 @@ AC_CACHE_VAL(sc_cv_struct_in_pktinfo,
  [sc_cv_struct_in_pktinfo=yes],
  [sc_cv_struct_in_pktinfo=no])])
  if test $sc_cv_struct_in_pktinfo = yes; then
@@ -1316,7 +1319,7 @@ index 218db56..4b8453f 100644
  fi
  AC_MSG_RESULT($sc_cv_struct_in_pktinfo)
  
-@@ -1653,7 +1733,7 @@ if test $sc_cv_struct_in_pktinfo = 'yes'; then
+@@ -1653,7 +1736,7 @@ if test $sc_cv_struct_in_pktinfo = 'yes'; then
     [sc_cv_pktinfo_ipi_spec_dst=yes],
     [sc_cv_pktinfo_ipi_spec_dst=no])])
     if test $sc_cv_pktinfo_ipi_spec_dst = yes; then
@@ -1325,7 +1328,7 @@ index 218db56..4b8453f 100644
     fi
     AC_MSG_RESULT($sc_cv_pktinfo_ipi_spec_dst)
  fi
-@@ -1666,7 +1746,7 @@ AC_CACHE_VAL(sc_cv_struct_in6_pktinfo,
+@@ -1666,7 +1749,7 @@ AC_CACHE_VAL(sc_cv_struct_in6_pktinfo,
  [sc_cv_struct_in6_pktinfo=yes],
  [sc_cv_struct_in6_pktinfo=no])])
  if test $sc_cv_struct_in6_pktinfo = yes; then
@@ -1334,7 +1337,7 @@ index 218db56..4b8453f 100644
  fi
  AC_MSG_RESULT($sc_cv_struct_in6_pktinfo)
  
-@@ -1678,7 +1758,7 @@ AC_CACHE_VAL(sc_cv_struct_tpacket_auxdata,
+@@ -1678,7 +1761,7 @@ AC_CACHE_VAL(sc_cv_struct_tpacket_auxdata,
  [sc_cv_struct_tpacket_auxdata=yes],
  [sc_cv_struct_tpacket_auxdata=no])])
  if test $sc_cv_struct_tpacket_auxdata = yes; then
@@ -1343,7 +1346,7 @@ index 218db56..4b8453f 100644
  fi
  AC_MSG_RESULT($sc_cv_struct_tpacket_auxdata)
  
-@@ -1689,7 +1769,7 @@ AC_CACHE_VAL(sc_cv_struct_tpacket_auxdata_tp_vlan_tpid,
+@@ -1689,7 +1772,7 @@ AC_CACHE_VAL(sc_cv_struct_tpacket_auxdata_tp_vlan_tpid,
  [sc_cv_struct_tpacket_auxdata_tp_vlan_tpid=yes],
  [sc_cv_struct_tpacket_auxdata_tp_vlan_tpid=no])])
  if test $sc_cv_struct_tpacket_auxdata_tp_vlan_tpid = yes; then
@@ -1352,7 +1355,7 @@ index 218db56..4b8453f 100644
  fi
  AC_MSG_RESULT($sc_cv_struct_tpacket_auxdata)
  
-@@ -1704,7 +1784,7 @@ AC_CACHE_VAL(sc_cv_struct_ip_ip_hl,
+@@ -1704,7 +1787,7 @@ AC_CACHE_VAL(sc_cv_struct_ip_ip_hl,
  [sc_cv_struct_ip_ip_hl=yes],
  [sc_cv_struct_ip_ip_hl=no])])
  if test $sc_cv_struct_ip_ip_hl = yes; then
@@ -1361,7 +1364,7 @@ index 218db56..4b8453f 100644
  fi
  AC_MSG_RESULT($sc_cv_struct_ip_ip_hl)
  
-@@ -1712,19 +1792,19 @@ AC_MSG_RESULT($sc_cv_struct_ip_ip_hl)
+@@ -1712,19 +1795,19 @@ AC_MSG_RESULT($sc_cv_struct_ip_ip_hl)
  dnl Library function checks
  
  dnl Check sigaction()
@@ -1391,7 +1394,7 @@ index 218db56..4b8453f 100644
  
  #if test "$ac_cv_func_hstrerror" = "yes"; then
  #  AC_MSG_CHECKING(if _XOPEN_SOURCE_EXTENDED is helpful)
-@@ -1747,94 +1827,97 @@ AC_CHECK_FUNC(inet_ntop, AC_DEFINE(HAVE_INET_NTOP))
+@@ -1747,94 +1830,97 @@ AC_CHECK_FUNC(inet_ntop, AC_DEFINE(HAVE_INET_NTOP))
  
  dnl Search for openpty()
  # MacOS
@@ -1558,7 +1561,7 @@ index 218db56..4b8453f 100644
  
  
  dnl Run time checks
-@@ -1853,7 +1936,7 @@ exit(snprintf(s,2,"ab")!=2);
+@@ -1853,7 +1939,7 @@ exit(snprintf(s,2,"ab")!=2);
  [ac_cv_have_c99_snprintf=no],
  [ac_cv_have_c99_snprintf=no])])
  if test $ac_cv_have_c99_snprintf = yes; then
@@ -1567,7 +1570,7 @@ index 218db56..4b8453f 100644
  fi
  AC_MSG_RESULT($ac_cv_have_c99_snprintf)
  
-@@ -1876,7 +1959,7 @@ else ac_cv_have_z_modifier=no
+@@ -1876,7 +1962,7 @@ else ac_cv_have_z_modifier=no
  fi
  )
  if test $ac_cv_have_z_modifier = yes; then
@@ -1576,7 +1579,7 @@ index 218db56..4b8453f 100644
  fi
  AC_MSG_RESULT($ac_cv_have_z_modifier)
  
-@@ -1916,7 +1999,7 @@ AC_CACHE_CHECK(shift offset of $1, $2,
+@@ -1916,7 +2002,7 @@ AC_CACHE_CHECK(shift offset of $1, $2,
   [$2=-1]
  )
   LIBS="$LIBS1"])
@@ -1585,7 +1588,7 @@ index 218db56..4b8453f 100644
  if test "$2" = -1; then
  AC_MSG_WARN(please determine $1_SHIFT manually)
  fi
-@@ -1983,7 +2066,7 @@ AC_CACHE_CHECK(for equivalent simple type of $2, $4,
+@@ -1983,7 +2069,7 @@ AC_CACHE_CHECK(for equivalent simple type of $2, $4,
          [$4="0 /* unknown, taking default */"
  ]) ]) ]) ]) ]) ]) ]) ])
   CFLAGS="$CFLAGS1" ])
@@ -1594,7 +1597,7 @@ index 218db56..4b8453f 100644
  ])
  
  dnl see AC_BASIC_TYPE
-@@ -2034,7 +2117,7 @@ int main() { $2 x=-1; return !(x<0);}],
+@@ -2034,7 +2120,7 @@ int main() { $2 x=-1; return !(x<0);}],
   )
  )
  ])
@@ -1603,7 +1606,7 @@ index 218db56..4b8453f 100644
  ])
  
  dnl find what physical type (basic C type) is equivalent to the given type.
-@@ -2077,7 +2160,7 @@ AC_TRY_COMPILE([$1],[$2 u;short v; return(&u.$3==&v);],
+@@ -2077,7 +2163,7 @@ AC_TRY_COMPILE([$1],[$2 u;short v; return(&u.$3==&v);],
         [$5="0 /* unknown, taking default */"
  ]) ]) ]) ]) ]) ]) ]) ])
   CFLAGS="$CFLAGS1" ])
@@ -1612,7 +1615,7 @@ index 218db56..4b8453f 100644
  ])
  
  dnl See AC_TYPEOF_COMPONENT
-@@ -2129,7 +2212,7 @@ int main() { x $2; x.$3=-1; return !(x.$3<0);}],
+@@ -2129,7 +2215,7 @@ int main() { x $2; x.$3=-1; return !(x.$3<0);}],
   )
  )
  ])
@@ -1621,7 +1624,7 @@ index 218db56..4b8453f 100644
  ])
  
  dnl find what physical type (basic C type) describes the given struct or union
-@@ -2218,13 +2301,13 @@ AC_TYPEOF_COMPONENT([#include "sysincludes.h"], struct cmsghdr, cmsg_len, HAVE_T
+@@ -2218,13 +2304,13 @@ AC_TYPEOF_COMPONENT([#include "sysincludes.h"], struct cmsghdr, cmsg_len, HAVE_T
  
  AC_MSG_CHECKING(for /dev/ptmx)
  if test -c /dev/ptmx; then
@@ -1637,7 +1640,7 @@ index 218db56..4b8453f 100644
      AC_MSG_RESULT(yes)
    else
      AC_MSG_RESULT(no)
-@@ -2233,7 +2316,7 @@ fi
+@@ -2233,7 +2319,7 @@ fi
  
  AC_MSG_CHECKING(for /proc)
  if test -d /proc; then
@@ -1646,7 +1649,7 @@ index 218db56..4b8453f 100644
    AC_MSG_RESULT(yes)
  else
    AC_MSG_RESULT(no)
-@@ -2241,7 +2324,7 @@ fi
+@@ -2241,7 +2327,7 @@ fi
  
  AC_MSG_CHECKING(for /proc/*/fd)
  if test -d /proc/$$/fd; then
@@ -1655,7 +1658,7 @@ index 218db56..4b8453f 100644
    AC_MSG_RESULT(yes)
  else
    AC_MSG_RESULT(no)
-@@ -2250,7 +2333,7 @@ fi
+@@ -2250,7 +2336,7 @@ fi
  # On Solaris family, we have to use /proc/$$/path/N
  AC_MSG_CHECKING(for /proc/*/path)
  if test -d /proc/$$/path; then
@@ -1664,7 +1667,7 @@ index 218db56..4b8453f 100644
    AC_MSG_RESULT(yes)
  else
    AC_MSG_RESULT(no)
-@@ -2263,7 +2346,7 @@ AC_CACHE_VAL(sc_cv_dirent_d_type,
+@@ -2263,7 +2349,7 @@ AC_CACHE_VAL(sc_cv_dirent_d_type,
  [sc_cv_dirent_d_type=yes],
  [sc_cv_dirent_d_type=no])])
  if test $sc_cv_dirent_d_type = yes; then
@@ -1673,7 +1676,7 @@ index 218db56..4b8453f 100644
  fi
  AC_MSG_RESULT($sc_cv_dirent_d_type)
  
-@@ -2272,19 +2355,19 @@ AC_MSG_CHECKING(for _res.retrans)
+@@ -2272,19 +2358,19 @@ AC_MSG_CHECKING(for _res.retrans)
  AC_TRY_COMPILE([#include <resolv.h>],
  [_res.retrans == 0],
  [AC_MSG_RESULT(yes);
@@ -1696,7 +1699,7 @@ index 218db56..4b8453f 100644
   [AC_MSG_RESULT(no)])
  
  
-@@ -2322,7 +2405,7 @@ if test -n "$WITH_LIBWRAP"; then
+@@ -2322,7 +2408,7 @@ if test -n "$WITH_LIBWRAP"; then
        done])
    ])
    if test "$sc_cv_have_tcpd_h" = "yes"; then
@@ -1705,7 +1708,7 @@ index 218db56..4b8453f 100644
    fi
    AC_MSG_NOTICE(checked for tcpd.h... $sc_cv_have_tcpd_h)
  fi	# end checking for tcpd.h
-@@ -2355,14 +2438,14 @@ int allow_severity,deny_severity;],[hosts_access(0)],
+@@ -2355,14 +2441,14 @@ int allow_severity,deny_severity;],[hosts_access(0)],
      ]
    )
    if test "$sc_cv_have_libwrap" = 'yes'; then
@@ -1722,7 +1725,7 @@ index 218db56..4b8453f 100644
    else
      AC_MSG_WARN([not all components of tcp wrappers found, disabling it]);
    fi
-@@ -2377,7 +2460,7 @@ if test -n "$WITH_LIBWRAP"; then
+@@ -2377,7 +2463,7 @@ if test -n "$WITH_LIBWRAP"; then
        [sc_cv_have_hosts_allow_table=yes],
        [sc_cv_have_hosts_allow_table=no])])
    if test $sc_cv_have_hosts_allow_table = yes; then
@@ -1731,7 +1734,7 @@ index 218db56..4b8453f 100644
    fi
    AC_MSG_RESULT($sc_cv_have_hosts_allow_table)
  fi # test -n "$WITH_LIBWRAP"
-@@ -2410,18 +2493,18 @@ AC_CACHE_VAL(sc_cv_decl_environ,
+@@ -2410,18 +2496,18 @@ AC_CACHE_VAL(sc_cv_decl_environ,
  [sc_cv_decl_environ=yes],
  [sc_cv_decl_environ=no])])
  if test $sc_cv_decl_environ = yes; then
@@ -1753,7 +1756,7 @@ index 218db56..4b8453f 100644
  fi
  AC_MSG_RESULT($sc_cv_var_environ)
  
-@@ -2429,11 +2512,33 @@ AC_MSG_RESULT($sc_cv_var_environ)
+@@ -2429,11 +2515,33 @@ AC_MSG_RESULT($sc_cv_var_environ)
  if test "$SOURCE_DATE_EPOCH"; then
    DATE_FMT="%d %b %Y %H:%M:%S"
    BUILD_DATE=$(LC_ALL=C date -u -d "@$SOURCE_DATE_EPOCH" "+$DATE_FMT")
