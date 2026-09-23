@@ -1,4 +1,4 @@
-From ed5858f50be0778d7c9e049c8829bbfca8cc92f3 Mon Sep 17 00:00:00 2001
+From f2552bd162ca5af132ed2ad50d6c30ea7e2dab07 Mon Sep 17 00:00:00 2001
 From: Juliusz Sosinowicz <juliusz@wolfssl.com>
 Date: Wed, 19 Aug 2026 16:17:18 +0000
 Subject: [PATCH] Fix ntp 4.2.8p18 patch for wolfSSL
@@ -17,9 +17,10 @@ Subject: [PATCH] Fix ntp 4.2.8p18 patch for wolfSSL
  sntp/configure.ac                 |  2 ++
  sntp/crypto.c                     |  2 +-
  sntp/m4/ntp_libntp.m4             |  2 ++
- sntp/m4/ntp_wolfssl.m4            | 58 +++++++++++++++++++++++++++++++
+ sntp/m4/ntp_wolfssl.m4            | 68 +++++++++++++++++++++++++++++++++++++
+ sntp/m4/openldap-thread-check.m4  |  2 +-
  util/ntp-keygen.c                 | 22 ++++++++++--
- 15 files changed, 117 insertions(+), 19 deletions(-)
+ 16 files changed, 128 insertions(+), 20 deletions(-)
  create mode 100644 sntp/m4/ntp_wolfssl.m4
 
 diff --git a/configure.ac b/configure.ac
@@ -371,6 +372,19 @@ index 0000000..75594ad
 +    fi
 +fi
 +])
+diff --git a/sntp/m4/openldap-thread-check.m4 b/sntp/m4/openldap-thread-check.m4
+index 7768a5c..d1576a2 100644
+--- a/sntp/m4/openldap-thread-check.m4
++++ b/sntp/m4/openldap-thread-check.m4
+@@ -265,7 +265,7 @@ pthread_rwlock_t rwlock;
+ #ifndef NULL
+ #define NULL (void*)0
+ #endif
+-]], [[pthread_detach(NULL);]])],[ol_cv_func_pthread_detach=yes],[ol_cv_func_pthread_detach=no])
++]], [[pthread_detach(pthread_self());]])],[ol_cv_func_pthread_detach=yes],[ol_cv_func_pthread_detach=no])
+ 			])
+ 
+ 			if test $ol_cv_func_pthread_detach = no ; then
 diff --git a/util/ntp-keygen.c b/util/ntp-keygen.c
 index c9c0ff9..de79f48 100644
 --- a/util/ntp-keygen.c
@@ -437,5 +451,5 @@ index c9c0ff9..de79f48 100644
  }
  
 -- 
-2.39.5
+2.43.0
 
