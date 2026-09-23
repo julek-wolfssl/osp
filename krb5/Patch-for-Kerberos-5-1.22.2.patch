@@ -1,4 +1,4 @@
-From 6313467ba6147073cdbdcd6494240baca6a8cd41 Mon Sep 17 00:00:00 2001
+From 68c8173cd16553e7fbe05472a6cbc2e8b0410706 Mon Sep 17 00:00:00 2001
 From: Juliusz Sosinowicz <juliusz@wolfssl.com>
 Date: Fri, 4 Sep 2026 10:08:22 +0000
 Subject: [PATCH] Patch for Kerberos 5 1.22.2
@@ -52,7 +52,7 @@ Tests that skip do so for reasons unrelated to wolfSSL: PKINIT, OTP (python pyra
  src/clients/kvno/t_kvno.py                  |  6 --
  src/configure.ac                            | 86 +++++++++++++++++++--
  src/include/k5-tls.h                        |  2 +-
- src/kdc/main.c                              | 15 ++++
+ src/kdc/main.c                              | 17 ++++
  src/lib/crypto/crypto_tests/Makefile.in     |  2 -
  src/lib/crypto/crypto_tests/camellia-test.c |  6 ++
  src/lib/crypto/crypto_tests/t_cksums.c      |  2 +
@@ -71,7 +71,7 @@ Tests that skip do so for reasons unrelated to wolfSSL: PKINIT, OTP (python pyra
  src/tests/Makefile.in                       |  3 +
  src/tests/gssapi/t_prf.c                    |  2 +
  src/util/k5test.py                          |  7 --
- 22 files changed, 147 insertions(+), 29 deletions(-)
+ 22 files changed, 149 insertions(+), 29 deletions(-)
 
 diff --git a/src/clients/kvno/t_kvno.py b/src/clients/kvno/t_kvno.py
 index e98b90e..b95f976 100644
@@ -239,13 +239,14 @@ index 0661c05..a5597eb 100644
  
  /*
 diff --git a/src/kdc/main.c b/src/kdc/main.c
-index 1052766..203cc89 100644
+index 1052766..04c88f7 100644
 --- a/src/kdc/main.c
 +++ b/src/kdc/main.c
-@@ -884,6 +884,16 @@ finish_realms(void)
+@@ -884,6 +884,18 @@ finish_realms(void)
    exit
  */
  
++#ifdef HAVE_LIBWOLFSSL
 +#include <wolfssl/wolfcrypt/settings.h>
 +#ifdef DEBUG_WOLFSSL
 +#include <wolfssl/wolfcrypt/logging.h>
@@ -255,15 +256,16 @@ index 1052766..203cc89 100644
 +    kdc_err(shandle.kdc_err_context, 0, "%s", logMessage);
 +}
 +#endif
++#endif
 +
  int main(int argc, char **argv)
  {
      krb5_error_code     retval;
-@@ -927,6 +937,11 @@ int main(int argc, char **argv)
+@@ -927,6 +939,11 @@ int main(int argc, char **argv)
         com_err to ensure that the error state exists in the context
         known to the krb5_klog callback. */
  
-+#ifdef DEBUG_WOLFSSL
++#if defined(HAVE_LIBWOLFSSL) && defined(DEBUG_WOLFSSL)
 +    wolfSSL_Debugging_ON();
 +    wolfSSL_SetLoggingCb(wolf_log_cb);
 +#endif
