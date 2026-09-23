@@ -1,4 +1,4 @@
-From 56d0eaca0b590835883d1a79721e5cc4b6fa7633 Mon Sep 17 00:00:00 2001
+From 8e30b710b0d3af89a731bc917b44d72503e681cf Mon Sep 17 00:00:00 2001
 From: Juliusz Sosinowicz <juliusz@wolfssl.com>
 Date: Fri, 4 Sep 2026 12:03:56 +0000
 Subject: [PATCH] wolfSSL Patch
@@ -50,7 +50,7 @@ When building for FIPS or with wolfSSL releases 5.7.2 and older add
 To debug the binary, configure wolfSSL with `--enable-debug` and libspdm with
 `-DTARGET=Debug`
 ---
- CMakeLists.txt                                | 39 +++++++++++++++-
+ CMakeLists.txt                                | 40 ++++++++++++++++-
  include/library/spdm_lib_config.h             | 16 +++++++
  os_stub/cryptlib_openssl/CMakeLists.txt       | 27 ++++++++---
  os_stub/cryptlib_openssl/hmac/hmac_sha.c      |  2 +
@@ -61,26 +61,13 @@ To debug the binary, configure wolfSSL with `--enable-debug` and libspdm with
  os_stub/cryptlib_openssl/pk/rsa_ext.c         |  6 +++
  os_stub/cryptlib_openssl/pk/x509.c            | 45 ++++++++++++++++---
  .../test_spdm_secured_message.c               |  2 +
- 11 files changed, 134 insertions(+), 12 deletions(-)
+ 11 files changed, 135 insertions(+), 12 deletions(-)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 6363199..ee3f928 100644
+index 6363199..94e951a 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -11,11 +11,20 @@ message("#########################")
- message("## Build Configuration ##")
- message("#########################")
- 
-+if(CRYPTO STREQUAL "wolfssl" OR IS_WOLFSSL STREQUAL "1")
-+    set(IS_WOLFSSL "1" CACHE INTERNAL "wolfSSL selected as the crypto backend")
-+    set(CRYPTO "openssl")
-+	add_definitions(-DSPDM_USING_WOLFSSL)
-+    if(NOT ENABLE_BINARY_BUILD STREQUAL "1")
-+        message(FATAL_ERROR "CRYPTO=wolfssl needs ENABLE_BINARY_BUILD=1 with COMPILED_LIBWOLFSSL_PATH and WOLFSSL_INCDIR")
-+    endif()
-+endif()
-+
- set(CMAKE_GENERATOR ${CMAKE_GENERATOR} CACHE STRING "Choose the generator of cmake")
+@@ -15,12 +15,22 @@ set(CMAKE_GENERATOR ${CMAKE_GENERATOR} CACHE STRING "Choose the generator of cma
  set(ARCH ${ARCH} CACHE STRING "Choose the arch of build: ia32 x64 arm aarch64 riscv32 riscv64 arc" FORCE)
  set(TOOLCHAIN ${TOOLCHAIN} CACHE STRING "Choose the toolchain of build: Windows: VS2015 VS2019 VS2022 CLANG ARM_DS2022 LIBFUZZER Linux: GCC ARM_DS2022 ARM_GNU ARM_GNU_BARE_METAL ARM_GCC AARCH64_GCC RISCV_GNU RISCV64_GCC RISCV_XPACK ARC_GCC CLANG CBMC AFL KLEE LIBFUZZER" FORCE)
  set(CMAKE_BUILD_TYPE ${TARGET} CACHE STRING "Choose the target of build: Debug Release" FORCE)
@@ -89,7 +76,22 @@ index 6363199..ee3f928 100644
  set(GCOV ${GCOV} CACHE STRING "Choose the target of Gcov: ON  OFF, and default is OFF" FORCE)
  set(STACK_USAGE ${STACK_USAGE} CACHE STRING "Choose the target of STACK_USAGE: ON  OFF, and default is OFF" FORCE)
  set(BUILD_LINUX_SHARED_LIB ${BUILD_LINUX_SHARED_LIB} CACHE STRING "Choose if libspdm shared library should be built for linux: ON OFF, and default is OFF" FORCE)
-@@ -179,9 +188,14 @@ endif()
+ set(X509_IGNORE_CRITICAL ${X509_IGNORE_CRITICAL} CACHE STRING "Choose if libspdm-provided cryptography libraries (OpenSSL and MbedTLS) ignore unsupported critical extensions in certificates : ON OFF, and default is OFF" FORCE)
+ 
++# The cache keeps CRYPTO=wolfssl. wolfSSL builds through the openssl stub.
++if(CRYPTO STREQUAL "wolfssl")
++    set(IS_WOLFSSL "1")
++    set(CRYPTO "openssl")
++    add_definitions(-DSPDM_USING_WOLFSSL)
++    if(NOT ENABLE_BINARY_BUILD STREQUAL "1")
++        message(FATAL_ERROR "CRYPTO=wolfssl needs ENABLE_BINARY_BUILD=1 with COMPILED_LIBWOLFSSL_PATH and WOLFSSL_INCDIR")
++    endif()
++endif()
++
+ if(NOT GCOV)
+     set(GCOV "OFF")
+ endif()
+@@ -179,9 +189,14 @@ endif()
  
  if(ENABLE_BINARY_BUILD STREQUAL "1")
      if(NOT CRYPTO STREQUAL "openssl")
@@ -105,7 +107,7 @@ index 6363199..ee3f928 100644
      if(NOT COMPILED_LIBCRYPTO_PATH)
          message(FATAL_ERROR "enabling binary build requires path to libcrypto.")
      endif()
-@@ -189,6 +203,9 @@ if(ENABLE_BINARY_BUILD STREQUAL "1")
+@@ -189,6 +204,9 @@ if(ENABLE_BINARY_BUILD STREQUAL "1")
      if(NOT COMPILED_LIBSSL_PATH)
          message(FATAL_ERROR "enabling binary build requires path to libssl.")
      endif()
@@ -115,7 +117,7 @@ index 6363199..ee3f928 100644
  
      # Disable EDDSA when binary builds are enabled. EDDSA may be enabled in the future.
      add_definitions(-DLIBSPDM_EDDSA_ED25519_SUPPORT=0)
-@@ -197,9 +214,14 @@ if(ENABLE_BINARY_BUILD STREQUAL "1")
+@@ -197,9 +215,14 @@ if(ENABLE_BINARY_BUILD STREQUAL "1")
      message("ENABLE_BINARY_BUILD=1")
      message("COMPILED_LIBCRYPTO_PATH=${COMPILED_LIBCRYPTO_PATH}")
      message("COMPILED_LIBSSL_PATH=${COMPILED_LIBSSL_PATH}")
@@ -130,7 +132,7 @@ index 6363199..ee3f928 100644
  
  else()
      set(CRYPTO_LIB_PATHS ${CRYPTO}lib)
-@@ -1103,6 +1125,18 @@ else()
+@@ -1103,6 +1126,18 @@ else()
                  PUBLIC mbedcrypto
              )
          elseif(CRYPTO STREQUAL "openssl")
@@ -149,7 +151,7 @@ index 6363199..ee3f928 100644
              set(CRYPTO_DEPS "-lssl -lcrypto")
              if(TOOLCHAIN STREQUAL "NONE")
                  target_link_libraries(${LIB_NAME}_crypto
-@@ -1115,6 +1149,7 @@ else()
+@@ -1115,6 +1150,7 @@ else()
                      PUBLIC crypto
                  )
              endif()
