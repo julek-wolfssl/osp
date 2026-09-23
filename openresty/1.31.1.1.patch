@@ -1,16 +1,16 @@
-From e2cefbdb8f58e0453b8b3b2699bc19216ad4e710 Mon Sep 17 00:00:00 2001
+From e12975045370697e080f43624a7a9fb13bfe134e Mon Sep 17 00:00:00 2001
 From: Juliusz Sosinowicz <juliusz@wolfssl.com>
 Date: Wed, 16 Sep 2026 15:40:12 +0000
 Subject: [PATCH] Compile with wolfSSL
 
 ---
  .../lua-resty-core-0.1.34rc3/lib/ngx/ssl.lua  |   7 +-
- bundle/nginx-wolfssl.patch                    | 332 ++++++++++++++++++
+ bundle/nginx-wolfssl.patch                    | 284 ++++++++++++++++++
  .../src/ngx_http_lua_ssl_certby.c             |   8 +
  .../src/ngx_stream_lua_module.c               |   4 +-
  .../src/ngx_stream_lua_ssl_certby.c           |   8 +
  configure                                     |  14 +-
- 6 files changed, 370 insertions(+), 3 deletions(-)
+ 6 files changed, 322 insertions(+), 3 deletions(-)
  create mode 100644 bundle/nginx-wolfssl.patch
 
 diff --git a/bundle/lua-resty-core-0.1.34rc3/lib/ngx/ssl.lua b/bundle/lua-resty-core-0.1.34rc3/lib/ngx/ssl.lua
@@ -40,10 +40,10 @@ index 027ab8a..b39b46e 100644
  
 diff --git a/bundle/nginx-wolfssl.patch b/bundle/nginx-wolfssl.patch
 new file mode 100644
-index 0000000..baedb7e
+index 0000000..5e9db66
 --- /dev/null
 +++ b/bundle/nginx-wolfssl.patch
-@@ -0,0 +1,332 @@
+@@ -0,0 +1,284 @@
 +diff --git a/auto/lib/openssl/conf b/auto/lib/openssl/conf
 +index 3068cae..9ac125e 100644
 +--- a/auto/lib/openssl/conf
@@ -117,7 +117,7 @@ index 0000000..baedb7e
 +   --with-openssl-opt=OPTIONS         set additional build options for OpenSSL
 + 
 +diff --git a/src/event/ngx_event_openssl.c b/src/event/ngx_event_openssl.c
-+index e0ca592..9e527f2 100644
++index e0ca592..bb43647 100644
 +--- a/src/event/ngx_event_openssl.c
 ++++ b/src/event/ngx_event_openssl.c
 +@@ -211,6 +211,14 @@ ngx_ssl_init(ngx_log_t *log)
@@ -201,8 +201,8 @@ index 0000000..baedb7e
 ++#ifdef WOLFSSL_NGINX
 ++    {
 ++        int i;
-++        for (i = sk_X509_num(chain) - 1; i > 0; i--) {
-++            if (wolfSSL_add0_chain_cert(c->ssl->connection,
+++        for (i = 0; i < sk_X509_num(chain); i++) {
+++            if (wolfSSL_add1_chain_cert(c->ssl->connection,
 ++                    sk_X509_value(chain, i)) == 0) {
 ++                sk_X509_pop_free(chain, X509_free);
 ++                return NGX_ERROR;
@@ -327,54 +327,6 @@ index 0000000..baedb7e
 ++#if (OPENSSL_VERSION_NUMBER < 0x1010000fL && !defined WOLFSSL_NGINX)
 + #define ASN1_STRING_get0_data(x)     (x)->data
 + #endif
-+ 
-+diff --git a/src/http/modules/ngx_http_ssl_module.c b/src/http/modules/ngx_http_ssl_module.c
-+index 43fcafd..6071374 100644
-+--- a/src/http/modules/ngx_http_ssl_module.c
-++++ b/src/http/modules/ngx_http_ssl_module.c
-+@@ -18,7 +18,11 @@ typedef ngx_int_t (*ngx_ssl_variable_handler_pt)(ngx_connection_t *c,
-+     ngx_pool_t *pool, ngx_str_t *s);
-+ 
-+ 
-++#ifndef WOLFSSL_NGINX
-+ #define NGX_DEFAULT_CIPHERS     "HIGH:!aNULL:!MD5"
-++#else
-++#define NGX_DEFAULT_CIPHERS     "ALL"
-++#endif
-+ #define NGX_DEFAULT_ECDH_CURVE  "auto"
-+ 
-+ #define NGX_HTTP_ALPN_PROTOS    "\x08http/1.1\x08http/1.0\x08http/0.9"
-+diff --git a/src/mail/ngx_mail_ssl_module.c b/src/mail/ngx_mail_ssl_module.c
-+index 079d0e7..c0319d4 100644
-+--- a/src/mail/ngx_mail_ssl_module.c
-++++ b/src/mail/ngx_mail_ssl_module.c
-+@@ -10,7 +10,11 @@
-+ #include <ngx_mail.h>
-+ 
-+ 
-++#ifndef WOLFSSL_NGINX
-+ #define NGX_DEFAULT_CIPHERS     "HIGH:!aNULL:!MD5"
-++#else
-++#define NGX_DEFAULT_CIPHERS     "ALL"
-++#endif
-+ #define NGX_DEFAULT_ECDH_CURVE  "auto"
-+ 
-+ 
-+diff --git a/src/stream/ngx_stream_ssl_module.c b/src/stream/ngx_stream_ssl_module.c
-+index 0e17cff..9c3a037 100644
-+--- a/src/stream/ngx_stream_ssl_module.c
-++++ b/src/stream/ngx_stream_ssl_module.c
-+@@ -14,7 +14,11 @@ typedef ngx_int_t (*ngx_ssl_variable_handler_pt)(ngx_connection_t *c,
-+     ngx_pool_t *pool, ngx_str_t *s);
-+ 
-+ 
-++#ifndef WOLFSSL_NGINX
-+ #define NGX_DEFAULT_CIPHERS     "HIGH:!aNULL:!MD5"
-++#else
-++#define NGX_DEFAULT_CIPHERS     "ALL"
-++#endif
-+ #define NGX_DEFAULT_ECDH_CURVE  "auto"
-+ 
 + 
 diff --git a/bundle/ngx_lua-0.10.31rc5/src/ngx_http_lua_ssl_certby.c b/bundle/ngx_lua-0.10.31rc5/src/ngx_http_lua_ssl_certby.c
 index ac2bd9a..11015aa 100644
